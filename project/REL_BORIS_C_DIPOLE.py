@@ -8,7 +8,9 @@ Field     : Earth's tilted dipole magnetic field (11.7 deg tilt)
 
 import numpy as np
 import matplotlib.pyplot as plt
-from mpl_toolkits.mplot3d import Axes3D
+from tqdm import tqdm
+import argparse
+
 
 # ── Physical constants ──────────────────────────────────────────────────────
 c    = 299792458.0       # speed of light          [m/s]
@@ -99,7 +101,7 @@ def simulate(name, q, m, r0, v0, dt, T_sim, store_every=1):
     gammas[0] = gamma0
 
     j = 1
-    for i in range(1, n_steps + 1):
+    for i in tqdm(range(1, n_steps + 1), desc=f"Simulating {name}"):
         r, u, gamma = boris_C_step(r, u, q, m, dt)
         if i % store_every == 0 and j < n_store:
             traj[j]   = r
@@ -115,122 +117,150 @@ def simulate(name, q, m, r0, v0, dt, T_sim, store_every=1):
           f"rel. energy error = {dg:.2e}")
     return traj, gammas
 
-# ── Particle configurations and initial conditions ──────────────────────────
-#
-# All three particles start at 2.5 RE on the x-axis.
-# Speed: 0.616 c,  pitch angle ~60 deg (vy = 0.5 v,  vz = 0.866 v).
-# This matches the initial conditions used in the reference RK4 example.
-#
-# Time steps are chosen well below each particle's cyclotron period T_c:
-#   B(2.5 RE) ~ 2 uT
-#   T_c(proton)  ~ 33 ms  ->  dt = 1 ms  (dt/T_c ~ 0.03)
-#   T_c(alpha)   ~ 33 ms  ->  dt = 1 ms  (same q/m ratio as proton)
-#   T_c(electron)~ 18 us  ->  dt = 1 us  (dt/T_c ~ 0.06)
-# ──────────────────────────────────────────────────────────────────────────
-r0   = np.array([2.5 * RE, 0.0, 0.0])
-beta = 0.616
-vy0  = beta * 0.500 * c
-vz0  = beta * 0.866 * c
 
-particles = [
-    dict(name='Proton',
-         q=  q_e,    m=    m_p,
-         v0=np.array([0.0, vy0, vz0]),
-         dt=1e-3,  T_sim=50.0,  store_every=10,
-          color='royalblue'),
-    dict(name='Electron',
-         q= -q_e,    m=    m_e,
-         v0=np.array([0.0, vy0, vz0]),
-         dt=1e-6,  T_sim=0.5,    store_every=10,
-         color='crimson'),
-    dict(name='Alpha particle',
-         q=2*q_e,   m=4.0*m_p,
-         v0=np.array([0.0, vy0, vz0]),
-         dt=1e-3,  T_sim=50.0,  store_every=10,
-         color='seagreen')
-]
+def run_simulation(particles_list):
+    """ Run the Boris-C simulation for all particles and return results.
 
-# ── Run ─────────────────────────────────────────────────────────────────────
-results = {}
-for p in particles:
-    print(f"Simulating {p['name']} ...")
-    traj, gammas = simulate(
-        p['name'], p['q'], p['m'], r0, p['v0'],
-        p['dt'], p['T_sim'], p['store_every'])
-    results[p['name']] = dict(traj=traj, gammas=gammas, color=p['color'])
-
-# ── 3-D trajectory plot ─────────────────────────────────────────────────────
-fig = plt.figure(figsize=(12, 10))
-ax  = fig.add_subplot(111, projection='3d')
-
-# Earth single point
-ax.scatter([0], [0], [0], color='steelblue', s=200, alpha=0.9)
-
-for name, d in results.items():
-    tr = d['traj']
-    ax.plot(tr[:, 0]/RE, tr[:, 1]/RE, tr[:, 2]/RE,
-            color=d['color'], linewidth=0.7, label=name)
-
-lim = 4
-ax.set_xlim(-lim, lim)
-ax.set_ylim(-lim, lim)
-ax.set_zlim(-lim, lim)
-ax.set_xlabel(r'$x\;[R_E]$')
-ax.set_ylabel(r'$y\;[R_E]$')
-ax.set_zlabel(r'$z\;[R_E]$')
-ax.set_title("Boris-C relativistic trajectories - Earth's dipole field\n"
-             "Zenitani & Umeda, Phys. Plasmas 25, 112110 (2018)")
-ax.legend(fontsize=11)
-plt.tight_layout()
-plt.savefig('boris_C_trajectories_3D.png', dpi=150, bbox_inches='tight')
-print("\nSaved: boris_C_trajectories_3D.png")
-
-# ── xy and xz projections ───────────────────────────────────────────────────
-fig2, (ax_xy, ax_xz) = plt.subplots(1, 2, figsize=(14, 6))
-
-for name, d in results.items():
-    tr = d['traj']
-    x  = tr[:, 0] / RE
-    y  = tr[:, 1] / RE
-    z  = tr[:, 2] / RE
-    ax_xy.plot(x, y, color=d['color'], linewidth=0.7, label=name)
-    ax_xz.plot(x, z, color=d['color'], linewidth=0.7, label=name)
-    ax_xy.scatter([0], [0], color='steelblue', s=200, alpha=0.9)
-    ax_xz.scatter([0], [0], color='steelblue', s=200, alpha=0.9)
+    particles_list : list of dicts
+    
+    Returns a dictionary with particle names as keys and trajectory/gamma data."""
+    results = {}
+    for p in particles_list:
+        print(f"Simulating {p['name']} ...")
+        traj, gammas = simulate(
+            p['name'], p['q'], p['m'], r0, p['v0'],
+            p['dt'], p['T_sim'], p['store_every'])
+        results[p['name']] = dict(traj=traj, gammas=gammas, color=p['color'])
+    
+    return results
 
 
-for ax, xlabel, ylabel in [(ax_xy, r'$x\;[R_E]$', r'$y\;[R_E]$'),
-                            (ax_xz, r'$x\;[R_E]$', r'$z\;[R_E]$')]:
-    ax.set_aspect('equal')
+def plot_results(results, show_plots=False):
+    """Plot the 3D trajectories, 2D projections, and energy conservation."""
+    # ── 3-D trajectory plot ─────────────────────────────────────────────────────
+    fig = plt.figure(figsize=(12, 10))
+    ax  = fig.add_subplot(111, projection='3d')
+
+    # Earth single point
+    ax.scatter([0], [0], [0], color='steelblue', s=200, alpha=0.9)
+
+    for name, d in results.items():
+        tr = d['traj']
+        ax.plot(tr[:, 0]/RE, tr[:, 1]/RE, tr[:, 2]/RE,
+                color=d['color'], linewidth=0.7, label=name)
+
+    lim = 4
     ax.set_xlim(-lim, lim)
     ax.set_ylim(-lim, lim)
-    ax.set_xlabel(xlabel)
-    ax.set_ylabel(ylabel)
-    ax.legend(fontsize=10)
-    ax.grid(True, linewidth=0.4)
+    ax.set_zlim(-lim, lim)
+    ax.set_xlabel(r'$x\;[R_E]$')
+    ax.set_ylabel(r'$y\;[R_E]$')
+    ax.set_zlabel(r'$z\;[R_E]$')
+    ax.set_title("Boris-C relativistic trajectories - Earth's dipole field\n"
+                "Zenitani & Umeda, Phys. Plasmas 25, 112110 (2018)")
+    ax.legend(fontsize=11)
+    plt.tight_layout()
+    plt.savefig('boris_C_trajectories_3D.png', dpi=150, bbox_inches='tight')
+    print("\nSaved: boris_C_trajectories_3D.png")
+
+    # ── xy and xz projections ───────────────────────────────────────────────────
+    fig2, (ax_xy, ax_xz) = plt.subplots(1, 2, figsize=(14, 6))
+
+    for name, d in results.items():
+        tr = d['traj']
+        x  = tr[:, 0] / RE
+        y  = tr[:, 1] / RE
+        z  = tr[:, 2] / RE
+        ax_xy.plot(x, y, color=d['color'], linewidth=0.7, label=name)
+        ax_xz.plot(x, z, color=d['color'], linewidth=0.7, label=name)
+        ax_xy.scatter([0], [0], color='steelblue', s=200, alpha=0.9)
+        ax_xz.scatter([0], [0], color='steelblue', s=200, alpha=0.9)
 
 
-ax_xy.set_title('xy projection')
-ax_xz.set_title('xz projection')
-fig2.suptitle("Boris-C - Earth's dipole field", fontsize=13)
-plt.tight_layout()
-plt.savefig('boris_C_trajectories_2D.png', dpi=150, bbox_inches='tight')
-print("Saved: boris_C_trajectories_2D.png")
+    for ax, xlabel, ylabel in [(ax_xy, r'$x\;[R_E]$', r'$y\;[R_E]$'),
+                                (ax_xz, r'$x\;[R_E]$', r'$z\;[R_E]$')]:
+        ax.set_aspect('equal')
+        ax.set_xlim(-lim, lim)
+        ax.set_ylim(-lim, lim)
+        ax.set_xlabel(xlabel)
+        ax.set_ylabel(ylabel)
+        ax.legend(fontsize=10)
+        ax.grid(True, linewidth=0.4)
 
-# ── Energy conservation (relative Lorentz factor error) ─────────────────────
-fig3, ax3 = plt.subplots(figsize=(10, 4))
-for name, d in results.items():
-    g0  = d['gammas'][0]
-    err = (d['gammas'] - g0) / g0
-    ax3.plot(err, color=d['color'], linewidth=0.8, label=name)
 
-ax3.axhline(0.0, color='k', linewidth=0.5, linestyle='--')
-ax3.set_xlabel('Stored step index')
-ax3.set_ylabel(r'$\Delta\gamma\;/\;\gamma_0$')
-ax3.set_title('Boris-C energy conservation')
-ax3.legend(fontsize=11)
-plt.tight_layout()
-plt.savefig('boris_C_energy.png', dpi=150, bbox_inches='tight')
-print("Saved: boris_C_energy.png")
+    ax_xy.set_title('xy projection')
+    ax_xz.set_title('xz projection')
+    fig2.suptitle("Boris-C - Earth's dipole field", fontsize=13)
+    plt.tight_layout()
+    plt.savefig('boris_C_trajectories_2D.png', dpi=150, bbox_inches='tight')
+    print("Saved: boris_C_trajectories_2D.png")
 
-plt.show()
+    # ── Energy conservation (relative Lorentz factor error) ─────────────────────
+    fig3, ax3 = plt.subplots(figsize=(10, 4))
+    for name, d in results.items():
+        g0  = d['gammas'][0]
+        err = (d['gammas'] - g0) / g0
+        ax3.plot(err, color=d['color'], linewidth=0.8, label=name)
+
+    ax3.axhline(0.0, color='k', linewidth=0.5, linestyle='--')
+    ax3.set_xlabel('Stored step index')
+    ax3.set_ylabel(r'$\Delta\gamma\;/\;\gamma_0$')
+    ax3.set_title('Boris-C energy conservation')
+    ax3.legend(fontsize=11)
+    plt.tight_layout()
+    plt.savefig('boris_C_energy.png', dpi=150, bbox_inches='tight')
+    print("Saved: boris_C_energy.png")
+
+    if show_plots:
+        plt.show()
+
+
+# ── Particle configurations and initial conditions ──────────────────────────
+def init_cond(beta):
+    #
+    # All three particles start at 2.5 RE on the x-axis.
+    # Speed: 0.616 c,  pitch angle ~60 deg (vy = 0.5 v,  vz = 0.866 v).
+    # This matches the initial conditions used in the reference RK4 example.
+    #
+    # Time steps are chosen well below each particle's cyclotron period T_c:
+    #   B(2.5 RE) ~ 2 uT
+    #   T_c(proton)  ~ 33 ms  ->  dt = 1 ms  (dt/T_c ~ 0.03)
+    #   T_c(alpha)   ~ 33 ms  ->  dt = 1 ms  (same q/m ratio as proton)
+    #   T_c(electron)~ 18 us  ->  dt = 1 us  (dt/T_c ~ 0.06)
+    # ──────────────────────────────────────────────────────────────────────────
+
+    vy0  = beta * 0.500 * c
+    vz0  = beta * 0.866 * c
+
+    particles = [
+        dict(name='Proton',
+            q=  q_e,    m=    m_p,
+            v0=np.array([0.0, vy0, vz0]),
+            dt=1e-3,  T_sim=50.0,  store_every=10,
+            color='royalblue'),
+        dict(name='Electron',
+            q= -q_e,    m=    m_e,
+            v0=np.array([0.0, vy0, vz0]),
+            dt=1e-3,  T_sim=50.0,    store_every=10,
+            color='crimson')
+            ,
+        dict(name='Alpha particle',
+            q=2*q_e,   m=4.0*m_p,
+            v0=np.array([0.0, vy0, vz0]),
+            dt=1e-3,  T_sim=0.5,  store_every=10,
+            color='seagreen')
+    ]
+
+    return particles
+
+# –––– CLI –──────────────────────────────────────────────────────────────────────────
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Relativistic Boris-C particle simulation in Earth's dipole field.")
+    parser.add_argument('--beta', type=float, default=0.616, help='Initial speed as a fraction of c (default: 0.616)')
+    parser.add_argument('--r0', type=float, nargs=3, default=[2.5 * RE, 0.0, 0.0], help='Initial position [m] (default: 2.5 RE on x-axis)')
+    parser.add_argument('--show_plots', action='store_true', help='Show plots after simulation',default=False)
+    args = parser.parse_args()
+
+    r0 = np.array(args.r0)
+    results = run_simulation(init_cond(args.beta))
+    plot_results(results, show_plots=args.show_plots)
