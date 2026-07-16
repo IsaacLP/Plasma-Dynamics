@@ -14,14 +14,19 @@ import argparse
 
 
 # ── Physical constants ──────────────────────────────────────────────────────
-c    = 299792458.0       # speed of light          [m/s]
-RE   = 6378137.0         # Earth radius             [m]
-m_e  = 9.10938356e-31    # electron mass            [kg]
-m_p  = 1.6726219e-27     # proton mass              [kg]
-q_e  = 1.6021766210e-19  # elementary charge        [C]
+c       = 299792458.0       # speed of light                     [m/s]
+RE      = 6378137.0         # Earth radius                        [m]
+m_e     = 9.10938356e-31    # electron mass                       [kg]
+m_p     = 1.6726219e-27     # proton mass                         [kg]
+m_alpha = 6.6446573e-27     # alpha particle (4He nucleus) mass   [kg]
+q_e     = 1.6021766210e-19  # elementary charge / eV→J factor     [C / J eV⁻¹]
 
 sinphi = np.sin(11.7 * np.pi / 180.0)   # dipole tilt (11.7 deg)
 cosphi = np.cos(11.7 * np.pi / 180.0)
+
+# Timestep as a fraction of the local relativistic cyclotron period
+F_DT = 0.03
+
 
 # ── Earth's tilted dipole magnetic field ────────────────────────────────────
 def dipole_B(r):
@@ -34,6 +39,7 @@ def dipole_B(r):
     Bz = -7.965626e15 * (2*cosphi*z**2 - cosphi*(x**2 + y**2)
                          + 3*z*y*sinphi) / r5
     return np.array([Bx, By, Bz])
+
 
 # ── Boris-C step (Zenitani & Umeda 2018) ───────────────────────────────────
 def boris_C_step(r, u, q, m, dt):
@@ -76,6 +82,7 @@ def boris_C_step(r, u, q, m, dt):
     r_new = r + (dt / gamma_new) * u_new
 
     return r_new, u_new, gamma_new
+
 
 # ── Simulation runner ───────────────────────────────────────────────────────
 def simulate(name, q, m, r0, v0, dt, T_sim, store_every=1):
@@ -120,30 +127,32 @@ def simulate(name, q, m, r0, v0, dt, T_sim, store_every=1):
 
 
 def run_simulation(particles_list):
-    """ Run the Boris-C simulation for all particles and return results.
+    """Run the Boris-C simulation for all particles and return results.
 
-    particles_list : list of dicts
-    
-    Returns a dictionary with particle names as keys and trajectory/gamma data."""
+    Returns a dictionary with particle names as keys and trajectory/gamma data.
+    """
     results = {}
     for p in particles_list:
         traj, gammas = simulate(
-            p['name'], p['q'], p['m'], r0, p['v0'],
+            p['name'], p['q'], p['m'], p['r0'], p['v0'],
             p['dt'], p['T_sim'], p['store_every'])
         results[p['name']] = dict(traj=traj, gammas=gammas, color=p['color'])
-    
     return results
 
 
 def plot_results(results, show_plots=False):
     """Plot the 3D trajectories, 2D projections, and energy conservation."""
-    # ── 3-D trajectory plot ─────────────────────────────────────────────────────
+
+    # Auto-scale to the furthest point in any trajectory
+    max_r = max(np.linalg.norm(d['traj'], axis=1).max() for d in results.values())
+    lim   = max(2, int(np.ceil(max_r / RE)) + 1)
+
+    # ── 3-D trajectory plot ─────────────────────────────────────────────────
     fig = plt.figure(figsize=(12, 10))
     ax  = fig.add_subplot(111, projection='3d')
 
-    # Earth as a sphere of radius 1 RE (axes are in RE units)
     u_ang = np.linspace(0, 2*np.pi, 60)
-    v_ang = np.linspace(0, np.pi, 30)
+    v_ang = np.linspace(0, np.pi,   30)
     xs = np.outer(np.cos(u_ang), np.sin(v_ang))
     ys = np.outer(np.sin(u_ang), np.sin(v_ang))
     zs = np.outer(np.ones_like(u_ang), np.cos(v_ang))
@@ -154,22 +163,19 @@ def plot_results(results, show_plots=False):
         ax.plot(tr[:, 0]/RE, tr[:, 1]/RE, tr[:, 2]/RE,
                 color=d['color'], linewidth=0.7, label=name)
 
-    lim = 4
     ax.set_xlim(-lim, lim)
     ax.set_ylim(-lim, lim)
     ax.set_zlim(-lim, lim)
     ax.set_xlabel(r'$x\;[R_E]$')
     ax.set_ylabel(r'$y\;[R_E]$')
     ax.set_zlabel(r'$z\;[R_E]$')
-    ax.set_title("Boris-C relativistic trajectories - Earth's dipole field\n"
-                "Zenitani & Umeda, Phys. Plasmas 25, 112110 (2018)")
     ax.legend(fontsize=11)
-    ax.set_box_aspect((1, 1, 1))   
+    ax.set_box_aspect((1, 1, 1))
     plt.tight_layout()
     plt.savefig('boris_C_trajectories_3D.png', dpi=150, bbox_inches='tight')
     print("\nSaved: boris_C_trajectories_3D.png")
 
-    # ── xy and xz projections ───────────────────────────────────────────────────
+    # ── xy and xz projections ───────────────────────────────────────────────
     fig2, (ax_xy, ax_xz) = plt.subplots(1, 2, figsize=(14, 6))
 
     for name, d in results.items():
@@ -182,7 +188,6 @@ def plot_results(results, show_plots=False):
         ax_xy.add_patch(Circle((0, 0), 1.0, color='steelblue', alpha=0.8, zorder=3))
         ax_xz.add_patch(Circle((0, 0), 1.0, color='steelblue', alpha=0.8, zorder=3))
 
-
     for ax, xlabel, ylabel in [(ax_xy, r'$x\;[R_E]$', r'$y\;[R_E]$'),
                                 (ax_xz, r'$x\;[R_E]$', r'$z\;[R_E]$')]:
         ax.set_aspect('equal')
@@ -193,15 +198,11 @@ def plot_results(results, show_plots=False):
         ax.legend(fontsize=10)
         ax.grid(True, linewidth=0.4)
 
-
-    ax_xy.set_title('xy projection')
-    ax_xz.set_title('xz projection')
-    fig2.suptitle("Boris-C - Earth's dipole field", fontsize=13)
     plt.tight_layout()
     plt.savefig('boris_C_trajectories_2D.png', dpi=150, bbox_inches='tight')
     print("Saved: boris_C_trajectories_2D.png")
 
-    # ── Energy conservation (relative Lorentz factor error) ─────────────────────
+    # ── Energy conservation (relative Lorentz factor error) ─────────────────
     fig3, ax3 = plt.subplots(figsize=(10, 4))
     for name, d in results.items():
         g0  = d['gammas'][0]
@@ -211,7 +212,6 @@ def plot_results(results, show_plots=False):
     ax3.axhline(0.0, color='k', linewidth=0.5, linestyle='--')
     ax3.set_xlabel('Stored step index')
     ax3.set_ylabel(r'$\Delta\gamma\;/\;\gamma_0$')
-    ax3.set_title('Boris-C energy conservation')
     ax3.legend(fontsize=11)
     plt.tight_layout()
     plt.savefig('boris_C_energy.png', dpi=150, bbox_inches='tight')
@@ -221,51 +221,160 @@ def plot_results(results, show_plots=False):
         plt.show()
 
 
+# ── Helpers ──────────────────────────────────────────────────────────────────
+def _ke_to_kinematics(KE_J, m):
+    """Kinetic energy [J] → (gamma, beta, v [m/s])."""
+    gamma = 1.0 + KE_J / (m * c**2)
+    beta  = np.sqrt(1.0 - 1.0 / gamma**2)
+    return gamma, beta, beta * c
+
+
+def _loss_cone_angle(L):
+    """
+    Rough dipole loss-cone half-angle [rad] for a mirror altitude of 1.02 RE.
+
+    Uses the dipole field-line relation r = L·RE·cos²λ and the mirror
+    condition B(λ_mirror)/B_eq = 1/sin²α_eq to derive the minimum equatorial
+    pitch angle that keeps the mirror point above the atmosphere.
+    """
+    R_loss = 1.02               # loss altitude [RE]
+    if L <= R_loss:
+        return np.pi / 2        # already below loss altitude
+    cos2_lam     = R_loss / L   # cos²(λ_loss) from dipole field-line equation
+    sin2_lam     = 1.0 - cos2_lam
+    sin2_alpha_L = cos2_lam**3 / np.sqrt(1.0 + 3.0 * sin2_lam)
+    return np.arcsin(np.sqrt(max(0.0, sin2_alpha_L)))
+
+
 # ── Particle configurations and initial conditions ──────────────────────────
-def init_cond(beta):
-    #
-    # All three particles start at 2.5 RE on the x-axis.
-    # Speed: 0.616 c,  pitch angle ~30 deg (vy = 0.5 v,  vz = 0.866 v).
-    # This matches the initial conditions used in the reference RK4 example.
-    #
-    # Time steps are chosen well below each particle's cyclotron period T_c:
-    #   B(2.5 RE) ~ 2 uT
-    #   T_c(proton)  ~ 33 ms  ->  dt = 1 ms   (dt/T_c ~ 0.03)
-    #   T_c(alpha)   ~ 66 ms  ->  dt = 1 ms   (q/m = e/2mp, half that of proton)
-    #   T_c(electron)~ 18 us  ->  dt = 1 us   (dt/T_c ~ 0.06)
-    # ──────────────────────────────────────────────────────────────────────────
+def init_cond(alpha_eq_deg=60.0, beta_override=None, r0_override=None):
+    """
+    Build the particle list with all derived simulation parameters.
 
-    vy0  = beta * 0.500 * c
-    vz0  = beta * 0.866 * c
+    alpha_eq_deg  : equatorial pitch angle [degrees], applied to all particles.
+    beta_override : if given, replaces per-particle kinetic energy with a fixed
+                    β = v/c for all particles (CLI --beta flag).
+    r0_override   : if given, replaces per-particle starting position for all
+                    particles (CLI --r0 flag).
 
-    particles = [
+    Velocity convention (B ≈ ẑ at the equatorial crossing on the x-axis):
+        vy = v · sin(α_eq)   perpendicular to B
+        vz = v · cos(α_eq)   field-aligned (parallel to B)
+
+    Derived parameters per particle:
+        dt          = F_DT · T_c,   T_c = 2π γ m / (|q| |B(r0)|)
+        T_sim       = N_bounce · τ_b,
+                      τ_b ≈ (L·RE / v) · (3.7 − 1.6·sin α_eq)
+        store_every = max(1, int(T_c / (20·dt)))   → ~20 stored pts per T_c
+    """
+    alpha_eq = np.radians(alpha_eq_deg)
+
+    # Per-particle physical setup.
+    # KE_eV: kinetic energy in electron-volts (1 eV = q_e J, species-independent).
+    raw = [
         dict(name='Proton',
-            q=  q_e,    m=    m_p,
-            v0=np.array([0.0, vy0, vz0]),
-            dt=1e-3,  T_sim=50.0,  store_every=10,
-            color='royalblue'),
+             q=  q_e, m=    m_p, KE_eV=100e6,
+             r0=np.array([2.5*RE, 0.0, 0.0]),
+             N_bounce=100, color='royalblue'),
         dict(name='Electron',
-            q= -q_e,    m=    m_e,
-            v0=np.array([0.0, vy0, vz0]),
-            dt=1e-6,  T_sim=2.0,   store_every=10,
-            color='crimson'),
+             q= -q_e, m=    m_e, KE_eV=200e3,
+             r0=np.array([5.0*RE, 0.0, 0.0]),
+             N_bounce= 20, color='crimson'),
         dict(name='Alpha particle',
-            q=2*q_e,   m=4.0*m_p,
-            v0=np.array([0.0, vy0, vz0]),
-            dt=1e-3,  T_sim=10.0,  store_every=10,
-            color='seagreen')
+             q=2*q_e, m=m_alpha, KE_eV= 20e6,
+             r0=np.array([2.5*RE, 0.0, 0.0]),
+             N_bounce= 20, color='seagreen'),
     ]
 
+    if r0_override is not None:
+        for p in raw:
+            p['r0'] = r0_override.copy()
+
+    # ── Summary table header ─────────────────────────────────────────────────
+    hdr = (f"  {'Particle':<14}  {'KE':>9}  {'γ':>6}  {'β':>6}  "
+           f"{'|B|(μT)':>7}  {'Tc(ms)':>7}  {'dt(μs)':>7}  "
+           f"{'τ_b(s)':>7}  {'T_sim(s)':>8}  {'n_steps':>10}")
+    print(f"\n{hdr}")
+    print("  " + "─" * (len(hdr) - 2))
+
+    particles = []
+    for p in raw:
+        m, q   = p['m'], p['q']
+        r0_p   = p['r0']
+
+        # Kinematics from kinetic energy (or beta override)
+        if beta_override is not None:
+            beta  = float(beta_override)
+            gamma = 1.0 / np.sqrt(1.0 - beta**2)
+            v     = beta * c
+            KE_J  = (gamma - 1.0) * m * c**2
+        else:
+            KE_J           = p['KE_eV'] * q_e
+            gamma, beta, v = _ke_to_kinematics(KE_J, m)
+
+        # Initial velocity: v_perp = v sinα (vy), v_par = v cosα (vz ≈ B direction)
+        v0 = np.array([0.0, v * np.sin(alpha_eq), v * np.cos(alpha_eq)])
+
+        # Field and timescales at r0
+        B_mag = np.linalg.norm(dipole_B(r0_p))
+        T_c   = 2.0 * np.pi * gamma * m / (abs(q) * B_mag)
+        dt    = F_DT * T_c
+        L     = np.linalg.norm(r0_p) / RE
+        tau_b = (L * RE / v) * (3.7 - 1.6 * np.sin(alpha_eq))
+        T_sim = p['N_bounce'] * tau_b
+        n_steps     = int(T_sim / dt)
+        store_every = max(1, int(T_c / (20.0 * dt)))
+
+        # ── Guard rails ──────────────────────────────────────────────────────
+        if n_steps > 5e7:
+            print(f"  WARNING [{p['name']}]: n_steps = {n_steps:.2e} > 5×10⁷ — "
+                  "runtime will be very long.")
+
+        alpha_loss = _loss_cone_angle(L)
+        if alpha_eq < alpha_loss:
+            print(f"  WARNING [{p['name']}]: pitch angle {alpha_eq_deg:.1f}° is below "
+                  f"the loss-cone angle {np.degrees(alpha_loss):.1f}° — particle likely "
+                  "precipitates (rough dipole estimate).")
+
+        # Format KE for display
+        KE_MeV = KE_J / q_e / 1e6
+        ke_str = f"{KE_MeV*1e3:.4g} keV" if KE_MeV < 1.0 else f"{KE_MeV:.4g} MeV"
+
+        print(f"  {p['name']:<14}  {ke_str:>9}  {gamma:>6.4f}  {beta:>6.4f}  "
+              f"{B_mag*1e6:>7.3f}  {T_c*1e3:>7.3f}  {dt*1e6:>7.2f}  "
+              f"{tau_b:>7.3f}  {T_sim:>8.3f}  {n_steps:>10,}")
+
+        particles.append(dict(
+            name=p['name'], q=q, m=m, color=p['color'],
+            r0=r0_p, v0=v0, dt=dt, T_sim=T_sim, store_every=store_every,
+        ))
+
+    print()
     return particles
 
-# –––– CLI –──────────────────────────────────────────────────────────────────────────
+
+# ── CLI ──────────────────────────────────────────────────────────────────────
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Relativistic Boris-C particle simulation in Earth's dipole field.")
-    parser.add_argument('--beta', type=float, default=0.616, help='Initial speed as a fraction of c (default: 0.616)')
-    parser.add_argument('--r0', type=float, nargs=3, default=[2.5 * RE, 0.0, 0.0], help='Initial position [m] (default: 2.5 RE on x-axis)')
-    parser.add_argument('--show_plots', action='store_true', help='Show plots after simulation',default=False)
+    parser = argparse.ArgumentParser(
+        description="Relativistic Boris-C particle simulation in Earth's dipole field.")
+    parser.add_argument(
+        '--pitch_angle', type=float, default=60.0,
+        help='Equatorial pitch angle in degrees for all particles (default: 60)')
+    parser.add_argument(
+        '--beta', type=float, default=None,
+        help='Override initial speed β=v/c for all particles, '
+             'ignoring per-particle kinetic energies')
+    parser.add_argument(
+        '--r0', type=float, nargs=3, default=None,
+        metavar=('X', 'Y', 'Z'),
+        help='Override initial position [m] for all particles '
+             '(default: per-particle values)')
+    parser.add_argument(
+        '--show_plots', action='store_true', default=False,
+        help='Show plots interactively after saving')
     args = parser.parse_args()
 
-    r0 = np.array(args.r0)
-    results = run_simulation(init_cond(args.beta))
+    r0_override = np.array(args.r0) if args.r0 is not None else None
+    particles   = init_cond(args.pitch_angle, args.beta, r0_override)
+    results     = run_simulation(particles)
     plot_results(results, show_plots=args.show_plots)
