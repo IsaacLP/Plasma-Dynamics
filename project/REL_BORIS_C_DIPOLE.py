@@ -6,6 +6,7 @@ Particles : proton, electron, alpha particle
 Field     : Earth's tilted dipole magnetic field (11.7 deg tilt)
 """
 
+from matplotlib.patches import Circle
 import numpy as np
 import matplotlib.pyplot as plt
 from tqdm import tqdm
@@ -126,7 +127,6 @@ def run_simulation(particles_list):
     Returns a dictionary with particle names as keys and trajectory/gamma data."""
     results = {}
     for p in particles_list:
-        print(f"Simulating {p['name']} ...")
         traj, gammas = simulate(
             p['name'], p['q'], p['m'], r0, p['v0'],
             p['dt'], p['T_sim'], p['store_every'])
@@ -141,8 +141,13 @@ def plot_results(results, show_plots=False):
     fig = plt.figure(figsize=(12, 10))
     ax  = fig.add_subplot(111, projection='3d')
 
-    # Earth single point
-    ax.scatter([0], [0], [0], color='steelblue', s=200, alpha=0.9)
+    # Earth as a sphere of radius 1 RE (axes are in RE units)
+    u_ang = np.linspace(0, 2*np.pi, 60)
+    v_ang = np.linspace(0, np.pi, 30)
+    xs = np.outer(np.cos(u_ang), np.sin(v_ang))
+    ys = np.outer(np.sin(u_ang), np.sin(v_ang))
+    zs = np.outer(np.ones_like(u_ang), np.cos(v_ang))
+    ax.plot_surface(xs, ys, zs, color='steelblue', alpha=0.6, linewidth=0)
 
     for name, d in results.items():
         tr = d['traj']
@@ -159,6 +164,7 @@ def plot_results(results, show_plots=False):
     ax.set_title("Boris-C relativistic trajectories - Earth's dipole field\n"
                 "Zenitani & Umeda, Phys. Plasmas 25, 112110 (2018)")
     ax.legend(fontsize=11)
+    ax.set_box_aspect((1, 1, 1))   
     plt.tight_layout()
     plt.savefig('boris_C_trajectories_3D.png', dpi=150, bbox_inches='tight')
     print("\nSaved: boris_C_trajectories_3D.png")
@@ -173,8 +179,8 @@ def plot_results(results, show_plots=False):
         z  = tr[:, 2] / RE
         ax_xy.plot(x, y, color=d['color'], linewidth=0.7, label=name)
         ax_xz.plot(x, z, color=d['color'], linewidth=0.7, label=name)
-        ax_xy.scatter([0], [0], color='steelblue', s=200, alpha=0.9)
-        ax_xz.scatter([0], [0], color='steelblue', s=200, alpha=0.9)
+        ax_xy.add_patch(Circle((0, 0), 1.0, color='steelblue', alpha=0.8, zorder=3))
+        ax_xz.add_patch(Circle((0, 0), 1.0, color='steelblue', alpha=0.8, zorder=3))
 
 
     for ax, xlabel, ylabel in [(ax_xy, r'$x\;[R_E]$', r'$y\;[R_E]$'),
@@ -219,14 +225,14 @@ def plot_results(results, show_plots=False):
 def init_cond(beta):
     #
     # All three particles start at 2.5 RE on the x-axis.
-    # Speed: 0.616 c,  pitch angle ~60 deg (vy = 0.5 v,  vz = 0.866 v).
+    # Speed: 0.616 c,  pitch angle ~30 deg (vy = 0.5 v,  vz = 0.866 v).
     # This matches the initial conditions used in the reference RK4 example.
     #
     # Time steps are chosen well below each particle's cyclotron period T_c:
     #   B(2.5 RE) ~ 2 uT
-    #   T_c(proton)  ~ 33 ms  ->  dt = 1 ms  (dt/T_c ~ 0.03)
-    #   T_c(alpha)   ~ 33 ms  ->  dt = 1 ms  (same q/m ratio as proton)
-    #   T_c(electron)~ 18 us  ->  dt = 1 us  (dt/T_c ~ 0.06)
+    #   T_c(proton)  ~ 33 ms  ->  dt = 1 ms   (dt/T_c ~ 0.03)
+    #   T_c(alpha)   ~ 66 ms  ->  dt = 1 ms   (q/m = e/2mp, half that of proton)
+    #   T_c(electron)~ 18 us  ->  dt = 1 us   (dt/T_c ~ 0.06)
     # ──────────────────────────────────────────────────────────────────────────
 
     vy0  = beta * 0.500 * c
@@ -241,13 +247,12 @@ def init_cond(beta):
         dict(name='Electron',
             q= -q_e,    m=    m_e,
             v0=np.array([0.0, vy0, vz0]),
-            dt=1e-3,  T_sim=50.0,    store_every=10,
-            color='crimson')
-            ,
+            dt=1e-6,  T_sim=2.0,   store_every=10,
+            color='crimson'),
         dict(name='Alpha particle',
             q=2*q_e,   m=4.0*m_p,
             v0=np.array([0.0, vy0, vz0]),
-            dt=1e-3,  T_sim=0.5,  store_every=10,
+            dt=1e-3,  T_sim=10.0,  store_every=10,
             color='seagreen')
     ]
 
