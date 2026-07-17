@@ -140,7 +140,7 @@ def run_simulation(particles_list):
     return results
 
 
-def plot_results(results, show_plots=False,lim='auto'):
+def plot_results(results, show_plots=True,lim='auto'):
     """Plot the 3D trajectories, 2D projections, and energy conservation."""
 
     if lim == 'auto':
@@ -257,7 +257,7 @@ def init_cond(alpha_eq_deg=60.0, beta_override=None):
     # KE_eV: kinetic energy in electron-volts (1 eV = q_e J, species-independent).
     raw = [
         dict(name='Proton',
-             q= q_e, m= m_p, KE_eV=200e6, # 200 MeV
+             q= q_e, m= m_p, KE_eV=250e6, # 250 MeV
              r0=np.array([2.5*RE, 0.0, 0.0]),
              N_bounce=100, color='royalblue'),
         dict(name='Electron',
@@ -337,11 +337,8 @@ if __name__ == "__main__":
     parser.add_argument(
         '--plot_limit', type=str, default='auto',
         help='Limit for 3D and 2D plots in Earth radii (default: \'auto\', scales to furthest trajectory point)')
-    parser.add_argument(
-        '--show_plots', action='store_true', default=False,
-        help='Show plots interactively after saving')
     args = parser.parse_args()
 
     particles   = init_cond(args.pitch_angle, args.beta)
     results     = run_simulation(particles)
-    plot_results(results, show_plots=args.show_plots, lim=args.plot_limit)
+    plot_results(results, lim=args.plot_limit)
