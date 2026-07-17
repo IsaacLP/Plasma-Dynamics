@@ -373,8 +373,8 @@ if __name__ == "__main__":
         help='Override initial speed beta=v/c for all particles, '
              'ignoring per-particle kinetic energies')
     parser.add_argument(
-        '--plot_limit', type=str, default='auto',
-        help='Limit for 3D and 2D plots in Earth radii (default: \'auto\', scales to furthest trajectory point)')
+        '--plot_limit', type=str, default='5',
+        help='Limit for 3D and 2D plots in Earth radii (default: 5, if \'auto\' scales to furthest trajectory point)')
     args = parser.parse_args()
 
     particles   = init_cond(args.pitch_angle, args.beta)
