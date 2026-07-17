@@ -257,22 +257,22 @@ def init_cond(alpha_eq_deg=60.0, beta_override=None):
     # KE_eV: kinetic energy in electron-volts (1 eV = q_e J, species-independent).
     raw = [
         dict(name='Proton',
-             q=  q_e, m=    m_p, KE_eV=100e6,
+             q= q_e, m= m_p, KE_eV=200e6, # 200 MeV
              r0=np.array([2.5*RE, 0.0, 0.0]),
              N_bounce=100, color='royalblue'),
         dict(name='Electron',
-             q= -q_e, m=    m_e, KE_eV=200e3,
-             r0=np.array([5.0*RE, 0.0, 0.0]),
+             q= -q_e, m=    m_e, KE_eV=1e6, # 1 MeV 
+             r0=np.array([4.5*RE, 0.0, 0.0]),
              N_bounce= 20, color='crimson'),
         dict(name='Alpha particle',
-             q=2*q_e, m=m_alpha, KE_eV= 20e6,
+             q=2*q_e, m=m_alpha, KE_eV=1e9, # 1 GeV
              r0=np.array([2.5*RE, 0.0, 0.0]),
-             N_bounce=20, color='seagreen'),
+             N_bounce=100, color='seagreen'),
     ]
 
     # ── Summary table header ─────────────────────────────────────────────────
     hdr = (f"  {'Particle':<14}  {'KE':>9}  {'gamma':>6}  {'beta':>6}  "
-           f"{'|B|(μT)':>7}  {'Tc(ms)':>7}  {'dt(us)':>7}  "
+           f"{'|B|(uT)':>7}  {'Tc(ms)':>7}  {'dt(us)':>7}  "
            f"{'tau_b(s)':>7}  {'T_sim(s)':>8}  {'n_steps':>10}")
     print(f"\n{hdr}")
     print("  " + "─" * (len(hdr) - 2))
@@ -335,8 +335,8 @@ if __name__ == "__main__":
         help='Override initial speed beta=v/c for all particles, '
              'ignoring per-particle kinetic energies')
     parser.add_argument(
-        '--plot_limit', type=float, default='auto',
-        help='Limit for 3D and 2D plots in Earth radii (default: auto, scales to furthest trajectory point)')
+        '--plot_limit', type=str, default='auto',
+        help='Limit for 3D and 2D plots in Earth radii (default: \'auto\', scales to furthest trajectory point)')
     parser.add_argument(
         '--show_plots', action='store_true', default=False,
         help='Show plots interactively after saving')
