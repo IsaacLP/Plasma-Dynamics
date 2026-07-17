@@ -14,7 +14,7 @@ import argparse
 
 
 # ── Physical constants ──────────────────────────────────────────────────────
-c       = 299792458.0       # speed of light                     [m/s]
+c       = 299792458.0       # speed of light                      [m/s]
 RE      = 6378137.0         # Earth radius                        [m]
 m_e     = 9.10938356e-31    # electron mass                       [kg]
 m_p     = 1.6726219e-27     # proton mass                         [kg]
@@ -91,10 +91,14 @@ def rk4_step(r, v, q, m, dt):
         inv_gamma = np.sqrt(max(0.0, 1.0 - np.dot(v_, v_) / c**2))
         return (q / m) * inv_gamma * np.cross(v_, dipole_B(r_))
 
-    k1r = dt * v;              k1v = dt * accel(r, v)
-    k2r = dt * (v + 0.5*k1v);  k2v = dt * accel(r + 0.5*k1r, v + 0.5*k1v)
-    k3r = dt * (v + 0.5*k2v);  k3v = dt * accel(r + 0.5*k2r, v + 0.5*k2v)
-    k4r = dt * (v +     k3v);  k4v = dt * accel(r +     k3r, v +     k3v)
+    k1r = dt * v
+    k1v = dt * accel(r, v)
+    k2r = dt * (v + 0.5*k1v)
+    k2v = dt * accel(r + 0.5*k1r, v + 0.5*k1v)
+    k3r = dt * (v + 0.5*k2v)
+    k3v = dt * accel(r + 0.5*k2r, v + 0.5*k2v)
+    k4r = dt * (v + k3v)
+    k4v = dt * accel(r + k3r, v + k3v)
 
     return (r + (k1r + 2*k2r + 2*k3r + k4r) / 6.0,
             v + (k1v + 2*k2v + 2*k3v + k4v) / 6.0)
