@@ -341,7 +341,9 @@ def init_cond(alpha_eq_deg=60.0, beta_override=None):
         tau_b = (L * RE / v) * (3.7 - 1.6 * np.sin(alpha_eq))
         T_sim = p['N_bounce'] * tau_b
         n_steps     = int(T_sim / dt)
-        store_every = max(1, int(T_c / (20.0 * dt)))
+        #store_every = max(1, int(T_c / (20.0 * dt)))
+        target_pts = 20  # ~20 stored points per cyclotron period
+        store_every = max(1, round(1/(target_pts * F_DT)))
 
 
         # Format KE for display
