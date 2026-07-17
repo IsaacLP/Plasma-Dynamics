@@ -1,3 +1,4 @@
 .vscode
 **.pdf
+__pycache__
 project/EXAMPLES_DCP/
