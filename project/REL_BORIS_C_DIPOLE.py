@@ -178,7 +178,7 @@ def run_simulation(particles_list):
     return results
 
 
-def plot_results(results, show_plots=True,lim='auto',out_dir='figures'):
+def plot_results(results,save=True,show=True,lim='auto',out_dir='figures'):
     """Plot the 3D trajectories, 2D projections, and energy conservation."""
 
     if lim == 'auto':
@@ -255,10 +255,12 @@ def plot_results(results, show_plots=True,lim='auto',out_dir='figures'):
     ax3.set_ylabel(r'$\Delta\gamma\;/\;\gamma_0$')
     ax3.legend(fontsize=11)
     plt.tight_layout()
-    plt.savefig(f'{out_dir}/boris_C_energy.png', dpi=150, bbox_inches='tight')
-    print(f"Saved: {out_dir}/boris_C_energy.png")
 
-    if show_plots:
+    if save:
+        plt.savefig(f'{out_dir}/boris_C_energy.png', dpi=150, bbox_inches='tight')
+        print(f"Saved: {out_dir}/boris_C_energy.png")
+
+    if show:
         plt.show()
 
 
