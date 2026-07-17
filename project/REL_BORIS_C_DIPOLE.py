@@ -310,8 +310,8 @@ def init_cond(alpha_eq_deg=60.0, beta_override=None):
 
     # ── Summary table header ─────────────────────────────────────────────────
     hdr = (f"  {'Particle':<14}  {'KE':>9}  {'gamma':>6}  {'beta':>6}  "
-           f"{'|B|(uT)':>7}  {'Tc(ms)':>7}  {'dt(us)':>7}  "
-           f"{'tau_b(s)':>7}  {'T_sim(s)':>8}  {'n_steps':>10}")
+           f"{'|B|(uT)':>7}  {'T_c [s]':>10}  {'dt [s]':>10}  "
+           f"{'tau_b [s]':>10}  {'T_sim [s]':>10}  {'n_steps':>10}")
     print(f"\n{hdr}")
     print("  " + "─" * (len(hdr) - 2))
 
@@ -330,7 +330,7 @@ def init_cond(alpha_eq_deg=60.0, beta_override=None):
             KE_J           = p['KE_eV'] * q_e
             gamma, beta, v = _ke_to_kinematics(KE_J, m)
 
-        # Initial velocity: v_perp = v sinα (vy), v_par = v cosα (vz ~ B direction)
+        # Initial velocity: v_perp = v sin alpha (vy), v_par = v cos alpha (vz ~ B direction)
         v0 = np.array([0.0, v * np.sin(alpha_eq), v * np.cos(alpha_eq)])
 
         # Field and timescales at r0
@@ -349,8 +349,8 @@ def init_cond(alpha_eq_deg=60.0, beta_override=None):
         ke_str = f"{KE_MeV*1e3:.4g} keV" if KE_MeV < 1.0 else f"{KE_MeV:.4g} MeV"
 
         print(f"  {p['name']:<14}  {ke_str:>9}  {gamma:>6.4f}  {beta:>6.4f}  "
-              f"{B_mag*1e6:>7.3f}  {T_c*1e3:>7.3f}  {dt*1e6:>7.2f}  "
-              f"{tau_b:>7.3f}  {T_sim:>8.3f}  {n_steps:>10,}")
+              f"{B_mag*1e6:>7.3f}  {T_c:>10.3e}  {dt:>10.3e}  "
+              f"{tau_b:>10.3e}  {T_sim:>10.4f}  {n_steps:>10,}")
 
         particles.append(dict(
             name=p['name'], q=q, m=m, color=p['color'],
