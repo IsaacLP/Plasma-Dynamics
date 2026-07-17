@@ -233,15 +233,13 @@ def _ke_to_kinematics(KE_J, m):
 
 
 # ── Particle configurations and initial conditions ──────────────────────────
-def init_cond(alpha_eq_deg=60.0, beta_override=None, r0_override=None):
+def init_cond(alpha_eq_deg=60.0, beta_override=None):
     """
     Build the particle list with all derived simulation parameters.
 
     alpha_eq_deg  : equatorial pitch angle [degrees], applied to all particles.
     beta_override : if given, replaces per-particle kinetic energy with a fixed
-                    β = v/c for all particles (CLI --beta flag).
-    r0_override   : if given, replaces per-particle starting position for all
-                    particles (CLI --r0 flag).
+                    beta = v/c for all particles (CLI --beta flag).
 
     Velocity convention (B ~ ẑ at the equatorial crossing on the x-axis):
         vy = v * sin(alpha_eq)   perpendicular to B
@@ -271,10 +269,6 @@ def init_cond(alpha_eq_deg=60.0, beta_override=None, r0_override=None):
              r0=np.array([2.5*RE, 0.0, 0.0]),
              N_bounce=20, color='seagreen'),
     ]
-
-    if r0_override is not None:
-        for p in raw:
-            p['r0'] = r0_override.copy()
 
     # ── Summary table header ─────────────────────────────────────────────────
     hdr = (f"  {'Particle':<14}  {'KE':>9}  {'gamma':>6}  {'beta':>6}  "
@@ -348,7 +342,6 @@ if __name__ == "__main__":
         help='Show plots interactively after saving')
     args = parser.parse_args()
 
-    r0_override = np.array(args.r0) if args.r0 is not None else None
-    particles   = init_cond(args.pitch_angle, args.beta, r0_override)
+    particles   = init_cond(args.pitch_angle, args.beta)
     results     = run_simulation(particles)
     plot_results(results, show_plots=args.show_plots, lim=args.plot_limit)
