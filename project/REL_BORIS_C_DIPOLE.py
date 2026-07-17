@@ -84,20 +84,28 @@ def boris_C_step(r, u, q, m, dt):
     return r_new, u_new, gamma_new
 
 
-# ── Simulation runner ───────────────────────────────────────────────────────
+# ── RK4 step (comparison integrator, not symplectic) ────────────────────────
+def rk4_step(r, v, q, m, dt):
+    """One RK4 step for dv/dt = (q/m)·sqrt(1-v^2/c^2)·(v x B), dr/dt = v  (E=0)."""
+    def accel(r_, v_):
+        inv_gamma = np.sqrt(max(0.0, 1.0 - np.dot(v_, v_) / c**2))
+        return (q / m) * inv_gamma * np.cross(v_, dipole_B(r_))
+
+    k1r = dt * v;              k1v = dt * accel(r, v)
+    k2r = dt * (v + 0.5*k1v);  k2v = dt * accel(r + 0.5*k1r, v + 0.5*k1v)
+    k3r = dt * (v + 0.5*k2v);  k3v = dt * accel(r + 0.5*k2r, v + 0.5*k2v)
+    k4r = dt * (v +     k3v);  k4v = dt * accel(r +     k3r, v +     k3v)
+
+    return (r + (k1r + 2*k2r + 2*k3r + k4r) / 6.0,
+            v + (k1v + 2*k2v + 2*k3v + k4v) / 6.0)
+
+
+# ── Integrators ──────────────────────────────────────────────────────────────
 def simulate(name, q, m, r0, v0, dt, T_sim, store_every=1):
-    """
-    Integrate the relativistic equation of motion with Boris-C.
-
-    v0          : initial velocity  [m/s]  (NOT u = gamma*v)
-    store_every : store one point every this many steps (memory saving)
-
-    Returns trajectory array  [n, 3]  in metres, and gamma history.
-    """
+    """Boris-C integrator. Returns trajectory [m] and gamma history."""
     n_steps = int(T_sim / dt)
     n_store = n_steps // store_every + 1
 
-    # Convert velocity to four-velocity u = gamma * v
     beta2  = np.dot(v0, v0) / c**2
     gamma0 = 1.0 / np.sqrt(1.0 - beta2)
     u = gamma0 * v0
@@ -109,34 +117,60 @@ def simulate(name, q, m, r0, v0, dt, T_sim, store_every=1):
     gammas[0] = gamma0
 
     j = 1
-    for i in tqdm(range(1, n_steps + 1), desc=f"Simulating {name}"):
+    for i in tqdm(range(1, n_steps + 1), desc=f"Boris-C  {name:<14}"):
         r, u, gamma = boris_C_step(r, u, q, m, dt)
         if i % store_every == 0 and j < n_store:
             traj[j]   = r
             gammas[j] = gamma
             j += 1
 
-    traj   = traj[:j]
-    gammas = gammas[:j]
+    return traj[:j], gammas[:j]
 
-    dg = abs(gammas[-1] - gamma0) / gamma0
-    print(f"  {name:<14s}  gamma_0 = {gamma0:.4f}  "
-          f"gamma_final = {gammas[-1]:.4f}  "
-          f"rel. energy error = {dg:.2e}")
-    return traj, gammas
+
+def simulate_rk4(name, q, m, r0, v0, dt, T_sim):
+    """RK4 integrator. Returns only (gamma0, gamma_final) for error comparison."""
+    n_steps = int(T_sim / dt)
+
+    beta2  = np.dot(v0, v0) / c**2
+    gamma0 = 1.0 / np.sqrt(1.0 - beta2)
+
+    r = r0.copy()
+    v = v0.copy()
+    for _ in tqdm(range(n_steps), desc=f"RK4      {name:<14}"):
+        r, v = rk4_step(r, v, q, m, dt)
+
+    v2          = np.dot(v, v)
+    gamma_final = 1.0 / np.sqrt(max(1e-30, 1.0 - v2 / c**2))
+    return gamma0, gamma_final
 
 
 def run_simulation(particles_list):
-    """Run the Boris-C simulation for all particles and return results.
-
-    Returns a dictionary with particle names as keys and trajectory/gamma data.
-    """
+    """Run Boris-C and RK4 for every particle; print a unified energy-error table."""
     results = {}
+    summary = []   # (name, gamma0, gamma_final_bc, gamma_final_rk4)
+
     for p in particles_list:
-        traj, gammas = simulate(
+        traj, gammas        = simulate(
             p['name'], p['q'], p['m'], p['r0'], p['v0'],
             p['dt'], p['T_sim'], p['store_every'])
+        gamma0, gamma_final = simulate_rk4(
+            p['name'], p['q'], p['m'], p['r0'], p['v0'],
+            p['dt'], p['T_sim'])
+
+        summary.append((p['name'], gammas[0], gammas[-1], gamma_final))
         results[p['name']] = dict(traj=traj, gammas=gammas, color=p['color'])
+
+    # ── Unified energy-error table ────────────────────────────────────────────
+    hdr = f"  {'Particle':<16} {'Method':<9} {'gamma_0':>8} {'gamma_final':>10} {'gamma_error':>10}"
+    print(f"\n{hdr}")
+    print("  " + "─" * (len(hdr) - 2))
+    for name, g0, gf_bc, gf_rk4 in summary:
+        dg_bc  = abs(gf_bc  - g0) / g0
+        dg_rk4 = abs(gf_rk4 - g0) / g0
+        print(f"  {name:<16} {'Boris-C':<9} {g0:>8.4f} {gf_bc:>10.4f} {dg_bc:>10.2e}")
+        print(f"  {'':16} {'RK4':<9} {g0:>8.4f} {gf_rk4:>10.4f} {dg_rk4:>10.2e}")
+    print()
+
     return results
 
 
