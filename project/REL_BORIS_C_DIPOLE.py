@@ -140,12 +140,15 @@ def run_simulation(particles_list):
     return results
 
 
-def plot_results(results, show_plots=False):
+def plot_results(results, show_plots=False,lim='auto'):
     """Plot the 3D trajectories, 2D projections, and energy conservation."""
 
-    # Auto-scale to the furthest point in any trajectory
-    max_r = max(np.linalg.norm(d['traj'], axis=1).max() for d in results.values())
-    lim   = max(2, int(np.ceil(max_r / RE)) + 1)
+    if lim == 'auto':
+        # Auto-scale to the furthest point in any trajectory
+        max_r = max(np.linalg.norm(d['traj'], axis=1).max() for d in results.values())
+        lim   = max(2, int(np.ceil(max_r / RE)) + 1)
+    else:
+        lim = float(lim)
 
     # ── 3-D trajectory plot ─────────────────────────────────────────────────
     fig = plt.figure(figsize=(12, 10))
@@ -266,7 +269,7 @@ def init_cond(alpha_eq_deg=60.0, beta_override=None, r0_override=None):
         dict(name='Alpha particle',
              q=2*q_e, m=m_alpha, KE_eV= 20e6,
              r0=np.array([2.5*RE, 0.0, 0.0]),
-             N_bounce= 20, color='seagreen'),
+             N_bounce=20, color='seagreen'),
     ]
 
     if r0_override is not None:
@@ -335,13 +338,11 @@ if __name__ == "__main__":
         help='Equatorial pitch angle in degrees for all particles (default: 60)')
     parser.add_argument(
         '--beta', type=float, default=None,
-        help='Override initial speed β=v/c for all particles, '
+        help='Override initial speed beta=v/c for all particles, '
              'ignoring per-particle kinetic energies')
     parser.add_argument(
-        '--r0', type=float, nargs=3, default=None,
-        metavar=('X', 'Y', 'Z'),
-        help='Override initial position [m] for all particles '
-             '(default: per-particle values)')
+        '--plot_limit', type=float, default='auto',
+        help='Limit for 3D and 2D plots in Earth radii (default: auto, scales to furthest trajectory point)')
     parser.add_argument(
         '--show_plots', action='store_true', default=False,
         help='Show plots interactively after saving')
@@ -350,4 +351,4 @@ if __name__ == "__main__":
     r0_override = np.array(args.r0) if args.r0 is not None else None
     particles   = init_cond(args.pitch_angle, args.beta, r0_override)
     results     = run_simulation(particles)
-    plot_results(results, show_plots=args.show_plots)
+    plot_results(results, show_plots=args.show_plots, lim=args.plot_limit)
