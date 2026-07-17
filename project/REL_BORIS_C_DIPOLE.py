@@ -19,7 +19,7 @@ RE      = 6378137.0         # Earth radius                        [m]
 m_e     = 9.10938356e-31    # electron mass                       [kg]
 m_p     = 1.6726219e-27     # proton mass                         [kg]
 m_alpha = 6.6446573e-27     # alpha particle (4He nucleus) mass   [kg]
-q_e     = 1.6021766210e-19  # elementary charge / eV→J factor     [C / J eV⁻¹]
+q_e     = 1.6021766210e-19  # elementary charge / eV->J factor    [C / J eV⁻¹]
 
 sinphi = np.sin(11.7 * np.pi / 180.0)   # dipole tilt (11.7 deg)
 cosphi = np.cos(11.7 * np.pi / 180.0)
@@ -229,23 +229,6 @@ def _ke_to_kinematics(KE_J, m):
     return gamma, beta, beta * c
 
 
-def _loss_cone_angle(L):
-    """
-    Rough dipole loss-cone half-angle [rad] for a mirror altitude of 1.02 RE.
-
-    Uses the dipole field-line relation r = L·RE·cos²λ and the mirror
-    condition B(λ_mirror)/B_eq = 1/sin²α_eq to derive the minimum equatorial
-    pitch angle that keeps the mirror point above the atmosphere.
-    """
-    R_loss = 1.02               # loss altitude [RE]
-    if L <= R_loss:
-        return np.pi / 2        # already below loss altitude
-    cos2_lam     = R_loss / L   # cos²(λ_loss) from dipole field-line equation
-    sin2_lam     = 1.0 - cos2_lam
-    sin2_alpha_L = cos2_lam**3 / np.sqrt(1.0 + 3.0 * sin2_lam)
-    return np.arcsin(np.sqrt(max(0.0, sin2_alpha_L)))
-
-
 # ── Particle configurations and initial conditions ──────────────────────────
 def init_cond(alpha_eq_deg=60.0, beta_override=None, r0_override=None):
     """
@@ -257,15 +240,15 @@ def init_cond(alpha_eq_deg=60.0, beta_override=None, r0_override=None):
     r0_override   : if given, replaces per-particle starting position for all
                     particles (CLI --r0 flag).
 
-    Velocity convention (B ≈ ẑ at the equatorial crossing on the x-axis):
-        vy = v · sin(α_eq)   perpendicular to B
-        vz = v · cos(α_eq)   field-aligned (parallel to B)
+    Velocity convention (B ~ ẑ at the equatorial crossing on the x-axis):
+        vy = v * sin(alpha_eq)   perpendicular to B
+        vz = v * cos(alpha_eq)   field-aligned (parallel to B)
 
     Derived parameters per particle:
-        dt          = F_DT · T_c,   T_c = 2π γ m / (|q| |B(r0)|)
-        T_sim       = N_bounce · τ_b,
-                      τ_b ≈ (L·RE / v) · (3.7 − 1.6·sin α_eq)
-        store_every = max(1, int(T_c / (20·dt)))   → ~20 stored pts per T_c
+        dt          = F_DT * T_c,   T_c = 2*pi*gamma*m / (|q|*|B(r0)|)
+        T_sim       = N_bounce * tau_b,
+                      tau_b ~ (L*RE / v) * (3.7 - 1.6*sin alpha_eq)
+        store_every = max(1, int(T_c / (20*dt)))   → ~20 stored pts per T_c
     """
     alpha_eq = np.radians(alpha_eq_deg)
 
@@ -291,9 +274,9 @@ def init_cond(alpha_eq_deg=60.0, beta_override=None, r0_override=None):
             p['r0'] = r0_override.copy()
 
     # ── Summary table header ─────────────────────────────────────────────────
-    hdr = (f"  {'Particle':<14}  {'KE':>9}  {'γ':>6}  {'β':>6}  "
-           f"{'|B|(μT)':>7}  {'Tc(ms)':>7}  {'dt(μs)':>7}  "
-           f"{'τ_b(s)':>7}  {'T_sim(s)':>8}  {'n_steps':>10}")
+    hdr = (f"  {'Particle':<14}  {'KE':>9}  {'gamma':>6}  {'beta':>6}  "
+           f"{'|B|(μT)':>7}  {'Tc(ms)':>7}  {'dt(us)':>7}  "
+           f"{'tau_b(s)':>7}  {'T_sim(s)':>8}  {'n_steps':>10}")
     print(f"\n{hdr}")
     print("  " + "─" * (len(hdr) - 2))
 
@@ -312,7 +295,7 @@ def init_cond(alpha_eq_deg=60.0, beta_override=None, r0_override=None):
             KE_J           = p['KE_eV'] * q_e
             gamma, beta, v = _ke_to_kinematics(KE_J, m)
 
-        # Initial velocity: v_perp = v sinα (vy), v_par = v cosα (vz ≈ B direction)
+        # Initial velocity: v_perp = v sinα (vy), v_par = v cosα (vz ~ B direction)
         v0 = np.array([0.0, v * np.sin(alpha_eq), v * np.cos(alpha_eq)])
 
         # Field and timescales at r0
@@ -325,16 +308,6 @@ def init_cond(alpha_eq_deg=60.0, beta_override=None, r0_override=None):
         n_steps     = int(T_sim / dt)
         store_every = max(1, int(T_c / (20.0 * dt)))
 
-        # ── Guard rails ──────────────────────────────────────────────────────
-        if n_steps > 5e7:
-            print(f"  WARNING [{p['name']}]: n_steps = {n_steps:.2e} > 5×10⁷ — "
-                  "runtime will be very long.")
-
-        alpha_loss = _loss_cone_angle(L)
-        if alpha_eq < alpha_loss:
-            print(f"  WARNING [{p['name']}]: pitch angle {alpha_eq_deg:.1f}° is below "
-                  f"the loss-cone angle {np.degrees(alpha_loss):.1f}° — particle likely "
-                  "precipitates (rough dipole estimate).")
 
         # Format KE for display
         KE_MeV = KE_J / q_e / 1e6
