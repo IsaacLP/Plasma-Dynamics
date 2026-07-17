@@ -178,7 +178,7 @@ def run_simulation(particles_list):
     return results
 
 
-def plot_results(results, show_plots=True,lim='auto'):
+def plot_results(results, show_plots=True,lim='auto',out_dir='figures'):
     """Plot the 3D trajectories, 2D projections, and energy conservation."""
 
     if lim == 'auto':
@@ -213,8 +213,8 @@ def plot_results(results, show_plots=True,lim='auto'):
     ax.legend(fontsize=11)
     ax.set_box_aspect((1, 1, 1))
     plt.tight_layout()
-    plt.savefig('boris_C_trajectories_3D.png', dpi=150, bbox_inches='tight')
-    print("\nSaved: boris_C_trajectories_3D.png")
+    plt.savefig(f'{out_dir}/boris_C_trajectories_3D.png', dpi=150, bbox_inches='tight')
+    print(f"\nSaved: {out_dir}/boris_C_trajectories_3D.png")
 
     # ── xy and xz projections ───────────────────────────────────────────────
     fig2, (ax_xy, ax_xz) = plt.subplots(1, 2, figsize=(14, 6))
@@ -240,8 +240,8 @@ def plot_results(results, show_plots=True,lim='auto'):
         ax.grid(True, linewidth=0.4)
 
     plt.tight_layout()
-    plt.savefig('boris_C_trajectories_2D.png', dpi=150, bbox_inches='tight')
-    print("Saved: boris_C_trajectories_2D.png")
+    plt.savefig(f'{out_dir}/boris_C_trajectories_2D.png', dpi=150, bbox_inches='tight')
+    print(f"Saved: {out_dir}/boris_C_trajectories_2D.png")
 
     # ── Energy conservation (relative Lorentz factor error) ─────────────────
     fig3, ax3 = plt.subplots(figsize=(10, 4))
@@ -255,8 +255,8 @@ def plot_results(results, show_plots=True,lim='auto'):
     ax3.set_ylabel(r'$\Delta\gamma\;/\;\gamma_0$')
     ax3.legend(fontsize=11)
     plt.tight_layout()
-    plt.savefig('boris_C_energy.png', dpi=150, bbox_inches='tight')
-    print("Saved: boris_C_energy.png")
+    plt.savefig(f'{out_dir}/boris_C_energy.png', dpi=150, bbox_inches='tight')
+    print(f"Saved: {out_dir}/boris_C_energy.png")
 
     if show_plots:
         plt.show()
