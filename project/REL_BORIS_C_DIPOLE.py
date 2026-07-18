@@ -213,8 +213,11 @@ def plot_results(results,save=True,show=True,lim='auto',out_dir='figures'):
     ax.legend(fontsize=11)
     ax.set_box_aspect((1, 1, 1))
     plt.tight_layout()
-    plt.savefig(f'{out_dir}/boris_C_trajectories_3D.png', dpi=150, bbox_inches='tight')
-    print(f"\nSaved: {out_dir}/boris_C_trajectories_3D.png")
+    if save:
+        plt.savefig(f'{out_dir}/boris_C_trajectories_3D.png', dpi=150, bbox_inches='tight')
+        print(f"\nSaved: {out_dir}/boris_C_trajectories_3D.png")
+    if show:
+        plt.show()
 
     # ── xy and xz projections ───────────────────────────────────────────────
     fig2, (ax_xy, ax_xz) = plt.subplots(1, 2, figsize=(14, 6))
@@ -240,8 +243,11 @@ def plot_results(results,save=True,show=True,lim='auto',out_dir='figures'):
         ax.grid(True, linewidth=0.4)
 
     plt.tight_layout()
-    plt.savefig(f'{out_dir}/boris_C_trajectories_2D.png', dpi=150, bbox_inches='tight')
-    print(f"Saved: {out_dir}/boris_C_trajectories_2D.png")
+    if save:
+        plt.savefig(f'{out_dir}/boris_C_trajectories_2D.png', dpi=150, bbox_inches='tight')
+        print(f"Saved: {out_dir}/boris_C_trajectories_2D.png")
+    if show:
+        plt.show()
 
     # ── Energy conservation (relative Lorentz factor error) ─────────────────
     fig3, ax3 = plt.subplots(figsize=(10, 4))
@@ -299,7 +305,7 @@ def init_cond(alpha_eq_deg=60.0, beta_override=None):
         dict(name='Proton',
              q= q_e, m= m_p, KE_eV=250e6, # 250 MeV
              r0=np.array([2.5*RE, 0.0, 0.0]),
-             N_bounce=100, color='royalblue'),
+             N_bounce=25, color='royalblue'),
         dict(name='Electron',
              q= -q_e, m=    m_e, KE_eV=1e6, # 1 MeV 
              r0=np.array([4.5*RE, 0.0, 0.0]),
