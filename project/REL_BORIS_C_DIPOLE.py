@@ -148,6 +148,7 @@ def simulate_rk4(name, q, m, r0, v0, dt, T_sim):
     return gamma0, gamma_final
 
 
+# –– Simulation and plotting functions ––––––––––––––––––––––––––––––––––––––––
 def run_simulation(particles_list):
     """Run Boris-C and RK4 for every particle; print a unified energy-error table."""
     results = {}
