@@ -178,7 +178,7 @@ def run_simulation(particles_list):
     return results
 
 
-def plot_results(results,save=True,show=True,lim='auto',out_dir='figures'):
+def plot_results(results,save=True,show=True,lim='auto',out_dir='figures',suffix=''):
     """Plot the 3D trajectories, 2D projections, and energy conservation."""
 
     if lim == 'auto':
@@ -214,8 +214,8 @@ def plot_results(results,save=True,show=True,lim='auto',out_dir='figures'):
     ax.set_box_aspect((1, 1, 1))
     plt.tight_layout()
     if save:
-        plt.savefig(f'{out_dir}/boris_C_trajectories_3D.png', dpi=150, bbox_inches='tight')
-        print(f"\nSaved: {out_dir}/boris_C_trajectories_3D.png")
+        plt.savefig(f'{out_dir}/boris_C_trajectories_3D{suffix}.png', dpi=150, bbox_inches='tight')
+        print(f"\nSaved: {out_dir}/boris_C_trajectories_3D{suffix}.png")
     if show:
         plt.show()
 
@@ -244,8 +244,8 @@ def plot_results(results,save=True,show=True,lim='auto',out_dir='figures'):
 
     plt.tight_layout()
     if save:
-        plt.savefig(f'{out_dir}/boris_C_trajectories_2D.png', dpi=150, bbox_inches='tight')
-        print(f"Saved: {out_dir}/boris_C_trajectories_2D.png")
+        plt.savefig(f'{out_dir}/boris_C_trajectories_2D{suffix}.png', dpi=150, bbox_inches='tight')
+        print(f"Saved: {out_dir}/boris_C_trajectories_2D{suffix}.png")
     if show:
         plt.show()
 
@@ -263,8 +263,8 @@ def plot_results(results,save=True,show=True,lim='auto',out_dir='figures'):
     plt.tight_layout()
 
     if save:
-        plt.savefig(f'{out_dir}/boris_C_energy.png', dpi=150, bbox_inches='tight')
-        print(f"Saved: {out_dir}/boris_C_energy.png")
+        plt.savefig(f'{out_dir}/boris_C_energy{suffix}.png', dpi=150, bbox_inches='tight')
+        print(f"Saved: {out_dir}/boris_C_energy{suffix}.png")
 
     if show:
         plt.show()
@@ -301,73 +301,94 @@ def init_cond(alpha_eq_deg=60.0, beta_override=None):
 
     # Per-particle physical setup.
     # KE_eV: kinetic energy in electron-volts (1 eV = q_e J, species-independent).
-    raw = [
+    # raw = [
+    #     dict(name='Proton',
+    #          q= q_e, m= m_p, KE_eV=252.78e6, # 250 MeV
+    #          r0=np.array([2.5*RE, 0.0, 0.0]),
+    #          N_bounce=25, color='royalblue'),
+    #     dict(name='Electron',
+    #          q= -q_e, m=    m_e, KE_eV=1e6, # 1 MeV 
+    #          r0=np.array([4.5*RE, 0.0, 0.0]),
+    #          N_bounce= 20, color='crimson'),
+    #     dict(name='Alpha particle',
+    #          q=2*q_e, m=m_alpha, KE_eV=1e9, # 1 GeV
+    #          r0=np.array([2.5*RE, 0.0, 0.0]),
+    #          N_bounce=100, color='seagreen'),
+    # ]
+
+    particles = [
         dict(name='Proton',
-             q= q_e, m= m_p, KE_eV=250e6, # 250 MeV
+             q= q_e, m= m_p,
+             T_sim=6.0,dt=0.0001,store_every=10,
              r0=np.array([2.5*RE, 0.0, 0.0]),
-             N_bounce=25, color='royalblue'),
+             v0=np.array([0.0, 0.616 * c * np.sin(alpha_eq), 0.616 * c * np.cos(alpha_eq)]),
+             color='royalblue'),
         dict(name='Electron',
-             q= -q_e, m=    m_e, KE_eV=1e6, # 1 MeV 
+             q=-q_e, m=m_e,
+             T_sim=0.6,dt=0.00001,store_every=10,
              r0=np.array([4.5*RE, 0.0, 0.0]),
-             N_bounce= 20, color='crimson'),
+             v0=np.array([0.0, 0.94 * c * np.sin(alpha_eq), 0.94 * c * np.cos(alpha_eq)]),
+             color='crimson'),
         dict(name='Alpha particle',
-             q=2*q_e, m=m_alpha, KE_eV=1e9, # 1 GeV
+             q=2*q_e, m=m_alpha,
+             T_sim=6.0,dt=0.0001,store_every=10,
              r0=np.array([2.5*RE, 0.0, 0.0]),
-             N_bounce=100, color='seagreen'),
+             v0=np.array([0.0, 0.5 * c * np.sin(alpha_eq), 0.5 * c * np.cos(alpha_eq)]),
+             color='seagreen'),
     ]
 
-    # ── Summary table header ─────────────────────────────────────────────────
-    hdr = (f"  {'Particle':<14}  {'KE':>9}  {'gamma':>6}  {'beta':>6}  "
-           f"{'|B|(uT)':>7}  {'T_c [s]':>10}  {'dt [s]':>10}  "
-           f"{'tau_b [s]':>10}  {'T_sim [s]':>10}  {'n_steps':>10}")
-    print(f"\n{hdr}")
-    print("  " + "─" * (len(hdr) - 2))
+    # # ── Summary table header ─────────────────────────────────────────────────
+    # hdr = (f"  {'Particle':<14}  {'KE':>9}  {'gamma':>6}  {'beta':>6}  "
+    #        f"{'|B|(uT)':>7}  {'T_c [s]':>10}  {'dt [s]':>10}  "
+    #        f"{'tau_b [s]':>10}  {'T_sim [s]':>10}  {'n_steps':>10}")
+    # print(f"\n{hdr}")
+    # print("  " + "─" * (len(hdr) - 2))
 
-    particles = []
-    for p in raw:
-        m, q   = p['m'], p['q']
-        r0_p   = p['r0']
+    # particles = []
+    # for p in raw:
+    #     m, q   = p['m'], p['q']
+    #     r0_p   = p['r0']
 
-        # Kinematics from kinetic energy (or beta override)
-        if beta_override is not None:
-            beta  = float(beta_override)
-            gamma = 1.0 / np.sqrt(1.0 - beta**2)
-            v     = beta * c
-            KE_J  = (gamma - 1.0) * m * c**2
-        else:
-            KE_J           = p['KE_eV'] * q_e
-            gamma, beta, v = _ke_to_kinematics(KE_J, m)
+    #     # Kinematics from kinetic energy (or beta override)
+    #     if beta_override is not None:
+    #         beta  = float(beta_override)
+    #         gamma = 1.0 / np.sqrt(1.0 - beta**2)
+    #         v     = beta * c
+    #         KE_J  = (gamma - 1.0) * m * c**2
+    #     else:
+    #         KE_J           = p['KE_eV'] * q_e
+    #         gamma, beta, v = _ke_to_kinematics(KE_J, m)
 
-        # Initial velocity: v_perp = v sin alpha (vy), v_par = v cos alpha (vz ~ B direction)
-        v0 = np.array([0.0, v * np.sin(alpha_eq), v * np.cos(alpha_eq)])
+    #     # Initial velocity: v_perp = v sin alpha (vy), v_par = v cos alpha (vz ~ B direction)
+    #     v0 = np.array([0.0, v * np.sin(alpha_eq), v * np.cos(alpha_eq)])
 
-        # Field and timescales at r0
-        B_mag = np.linalg.norm(dipole_B(r0_p))
-        T_c   = 2.0 * np.pi * gamma * m / (abs(q) * B_mag)
-        dt    = F_DT * T_c
-        L     = np.linalg.norm(r0_p) / RE
-        tau_b = (L * RE / v) * (3.7 - 1.6 * np.sin(alpha_eq))
-        T_sim = p['N_bounce'] * tau_b
-        n_steps     = int(T_sim / dt)
-        #store_every = max(1, int(T_c / (20.0 * dt)))
-        target_pts = 20  # ~20 stored points per cyclotron period
-        store_every = max(1, round(1/(target_pts * F_DT)))
+    #     # Field and timescales at r0
+    #     B_mag = np.linalg.norm(dipole_B(r0_p))
+    #     T_c   = 2.0 * np.pi * gamma * m / (abs(q) * B_mag)
+    #     dt    = F_DT * T_c
+    #     L     = np.linalg.norm(r0_p) / RE
+    #     tau_b = (L * RE / v) * (3.7 - 1.6 * np.sin(alpha_eq))
+    #     T_sim = p['N_bounce'] * tau_b
+    #     n_steps     = int(T_sim / dt)
+    #     #store_every = max(1, int(T_c / (20.0 * dt)))
+    #     target_pts = 20  # ~20 stored points per cyclotron period
+    #     store_every = max(1, round(1/(target_pts * F_DT)))
 
 
-        # Format KE for display
-        KE_MeV = KE_J / q_e / 1e6
-        ke_str = f"{KE_MeV*1e3:.4g} keV" if KE_MeV < 1.0 else f"{KE_MeV:.4g} MeV"
+    #     # Format KE for display
+    #     KE_MeV = KE_J / q_e / 1e6
+    #     ke_str = f"{KE_MeV*1e3:.4g} keV" if KE_MeV < 1.0 else f"{KE_MeV:.4g} MeV"
 
-        print(f"  {p['name']:<14}  {ke_str:>9}  {gamma:>6.4f}  {beta:>6.4f}  "
-              f"{B_mag*1e6:>7.3f}  {T_c:>10.3e}  {dt:>10.3e}  "
-              f"{tau_b:>10.3e}  {T_sim:>10.4f}  {n_steps:>10,}")
+    #     print(f"  {p['name']:<14}  {ke_str:>9}  {gamma:>6.4f}  {beta:>6.4f}  "
+    #           f"{B_mag*1e6:>7.3f}  {T_c:>10.3e}  {dt:>10.3e}  "
+    #           f"{tau_b:>10.3e}  {T_sim:>10.4f}  {n_steps:>10,}")
 
-        particles.append(dict(
-            name=p['name'], q=q, m=m, color=p['color'],
-            r0=r0_p, v0=v0, dt=dt, T_sim=T_sim, store_every=store_every,
-        ))
+    #     particles.append(dict(
+    #         name=p['name'], q=q, m=m, color=p['color'],
+    #         r0=r0_p, v0=v0, dt=dt, T_sim=T_sim, store_every=store_every,
+    #     ))
 
-    print()
+    # print()
     return particles
 
 
@@ -379,14 +400,13 @@ if __name__ == "__main__":
         '--pitch_angle', type=float, default=60.0,
         help='Equatorial pitch angle in degrees for all particles (default: 60)')
     parser.add_argument(
-        '--beta', type=float, default=None,
-        help='Override initial speed beta=v/c for all particles, '
-             'ignoring per-particle kinetic energies')
+        '--no_save', action='store_true',
+        help='Do not save plots to files (default: save)')
     parser.add_argument(
-        '--plot_limit', type=str, default='5',
-        help='Limit for 3D and 2D plots in Earth radii (default: 5, if \'auto\' scales to furthest trajectory point)')
+        '--suffix', type=str, default='',
+        help='Suffix for output filenames (default: empty string)')
     args = parser.parse_args()
 
     particles   = init_cond(args.pitch_angle, args.beta)
     results     = run_simulation(particles)
-    plot_results(results, lim=args.plot_limit)
+    plot_results(results, save=not args.no_save,suffix=args.suffix)
