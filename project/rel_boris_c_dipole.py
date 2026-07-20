@@ -298,9 +298,9 @@ def init_cond(alpha_eq_deg=30.0,KE=None,r0=None):
     if KE is not None:
         KE = np.array(KE)
         KE = KE * q_e  # Convert eV to Joules
-        for p, KE in zip(particles, KE):
+        for p, KE_i in zip(particles, KE):
             # Override the initial speed based on the specified kinetic energy
-            gamma = 1 + KE / (p['m'] * c**2)
+            gamma = 1 + KE_i / (p['m'] * c**2)
             beta = np.sqrt(1 - 1/gamma**2)
             speed = beta * c
             p['v0'] = np.array([0.0, speed * np.sin(alpha_eq), speed * np.cos(alpha_eq)])
@@ -309,6 +309,12 @@ def init_cond(alpha_eq_deg=30.0,KE=None,r0=None):
         r0 = np.array(r0)
         for p, r in zip(particles, r0):
             p['r0'] = np.array([r*RE, 0.0, 0.0])  # Override the initial position in Earth radii
+    
+    for p in particles:
+        beta = np.linalg.norm(p['v0']) / c
+        KE_i = (np.sqrt(1 - beta**2) - 1) * p['m'] * c**2 / q_e  # in eV
+        print(f"Setting {p['name']} initial speed v0 = beta * c with beta={beta:.3e} based on KE={KE_i:.2e} eV")
+        print(f"Setting {p['name']} initial position to {p['r0']/RE} RE")
 
     return particles
 
