@@ -262,7 +262,7 @@ def plot_results(results,save=True,show=True,lim=5,out_dir='figures',suffix=''):
 
 
 # ── Particle configurations and initial conditions ──────────────────────────
-def init_cond(alpha_eq_deg=60.0,KE=None,r0=None):
+def init_cond(alpha_eq_deg=30.0,KE=None,r0=None):
     """
     Build the particle list with initial conditions for the simulation.
     The equatorial pitch angle is the same for all particles. If KE is provided, it will override the initial speed based on the specified kinetic energy.
@@ -318,8 +318,8 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="Relativistic Boris-C particle simulation in Earth's dipole field.")
     parser.add_argument(
-        '--alpha', type=float, default=60.0,
-        help='Equatorial pitch angle in degrees for all particles (default: 60)')
+        '--alpha', type=float, default=30.0,
+        help='Equatorial pitch angle in degrees for all particles (default: 30.0)')
     parser.add_argument(
         '--plot_limit', type=int, default=5,
         help='Limit for 3D and 2D plots in Earth radii (default: 5)')
