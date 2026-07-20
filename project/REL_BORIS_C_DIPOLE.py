@@ -297,7 +297,7 @@ def init_cond(alpha_eq_deg=60.0,KE=None,r0=None):
 
     if KE is not None:
         KE = np.array(KE)
-        KE = KE / q_e  # Convert eV to Joules
+        KE = KE * q_e  # Convert eV to Joules
         for p, KE in zip(particles, KE):
             # Override the initial speed based on the specified kinetic energy
             gamma = 1 + KE / (p['m'] * c**2)
@@ -307,8 +307,8 @@ def init_cond(alpha_eq_deg=60.0,KE=None,r0=None):
 
     if r0 is not None:
         r0 = np.array(r0)
-        for p, r0 in zip(particles, r0):
-            p['r0'] = r0*RE  # Convert Earth radii to meters
+        for p, r in zip(particles, r0):
+            p['r0'] = np.array([r*RE, 0.0, 0.0])  # Override the initial position in Earth radii
 
     return particles
 
@@ -318,7 +318,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="Relativistic Boris-C particle simulation in Earth's dipole field.")
     parser.add_argument(
-        '--pitch_angle', type=float, default=60.0,
+        '--alpha', type=float, default=60.0,
         help='Equatorial pitch angle in degrees for all particles (default: 60)')
     parser.add_argument(
         '--plot_limit', type=int, default=5,
@@ -327,13 +327,13 @@ if __name__ == "__main__":
         '--suffix', type=str, default='',
         help='Optional suffix for output figure filenames (default: empty)')
     parser.add_argument(
-        '--kinetic_energy', type=list, default=None,
+        '--ke', type=float, nargs='+', default=None,
         help='Override default initial speed based on specified kinetic energy array (default: None)')
     parser.add_argument(
-        '--initial_positions', type=list, default=None,
+        '--r0', type=float, nargs='+', default=None,
         help='Override default initial positions with specified array of position vectors in Earth radii (default: None)')
     args = parser.parse_args()
 
-    particles   = init_cond(args.pitch_angle, KE=args.kinetic_energy, r0=args.initial_positions)
+    particles   = init_cond(args.alpha, KE=args.ke, r0=args.r0)
     results     = run_simulation(particles)
     plot_results(results, lim=args.plot_limit, suffix=args.suffix)
