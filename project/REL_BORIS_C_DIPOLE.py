@@ -24,9 +24,6 @@ q_e     = 1.6021766210e-19  # elementary charge / eV->J factor    [C / J eV⁻¹
 sinphi = np.sin(11.7 * np.pi / 180.0)   # dipole tilt (11.7 deg)
 cosphi = np.cos(11.7 * np.pi / 180.0)
 
-# Timestep as a fraction of the local relativistic cyclotron period
-F_DT = 0.03
-
 
 # ── Earth's tilted dipole magnetic field ────────────────────────────────────
 def dipole_B(r):
@@ -265,10 +262,15 @@ def plot_results(results,save=True,show=True,lim=5,out_dir='figures',suffix=''):
 
 
 # ── Particle configurations and initial conditions ──────────────────────────
-def init_cond(alpha_eq_deg=60.0):
+def init_cond(alpha_eq_deg=60.0,KE=None,r0=None):
     """
     Build the particle list with initial conditions for the simulation.
-    The equatorial pitch angle is the same for all particles.
+    The equatorial pitch angle is the same for all particles. If KE is provided, it will override the initial speed based on the specified kinetic energy.
+
+    Parameters:
+    - alpha_eq_deg (float): Equatorial pitch angle in degrees for all particles.
+    - KE (array): Optional kinetic energy in eV to override the initial speed.
+    - r0 (array): Optional initial position in earth radii for all particles.
     """
     alpha_eq = np.radians(alpha_eq_deg)
 
@@ -289,9 +291,24 @@ def init_cond(alpha_eq_deg=60.0):
              q=2*q_e, m=m_alpha,
              T_sim=6.0,dt=0.0001,store_every=10,
              r0=np.array([2.5*RE, 0.0, 0.0]),
-             v0=np.array([0.0, 0.5 * c * np.sin(alpha_eq), 0.5 * c * np.cos(alpha_eq)]),
+             v0=np.array([0.0, 0.616 * c * np.sin(alpha_eq), 0.616 * c * np.cos(alpha_eq)]),
              color='seagreen'),
     ]
+
+    if KE is not None:
+        KE = np.array(KE)
+        KE = KE / q_e  # Convert eV to Joules
+        for p, KE in zip(particles, KE):
+            # Override the initial speed based on the specified kinetic energy
+            gamma = 1 + KE / (p['m'] * c**2)
+            beta = np.sqrt(1 - 1/gamma**2)
+            speed = beta * c
+            p['v0'] = np.array([0.0, speed * np.sin(alpha_eq), speed * np.cos(alpha_eq)])
+
+    if r0 is not None:
+        r0 = np.array(r0)
+        for p, r0 in zip(particles, r0):
+            p['r0'] = r0*RE  # Convert Earth radii to meters
 
     return particles
 
@@ -309,8 +326,14 @@ if __name__ == "__main__":
     parser.add_argument(
         '--suffix', type=str, default='',
         help='Optional suffix for output figure filenames (default: empty)')
+    parser.add_argument(
+        '--kinetic_energy', type=list, default=None,
+        help='Override default initial speed based on specified kinetic energy array (default: None)')
+    parser.add_argument(
+        '--initial_positions', type=list, default=None,
+        help='Override default initial positions with specified array of position vectors in Earth radii (default: None)')
     args = parser.parse_args()
 
-    particles   = init_cond(args.pitch_angle)
+    particles   = init_cond(args.pitch_angle, KE=args.kinetic_energy, r0=args.initial_positions)
     results     = run_simulation(particles)
     plot_results(results, lim=args.plot_limit, suffix=args.suffix)
