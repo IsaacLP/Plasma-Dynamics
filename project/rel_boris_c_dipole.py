@@ -312,7 +312,7 @@ def init_cond(alpha_eq_deg=30.0,KE=None,r0=None):
     
     for p in particles:
         beta = np.linalg.norm(p['v0']) / c
-        KE_i = (np.sqrt(1 - beta**2) - 1) * p['m'] * c**2 / np.abs(q_e)  # in eV
+        KE_i = (1.0 / np.sqrt(1 - beta**2) - 1) * p['m'] * c**2 / np.abs(q_e)  # in eV
         print(f"Setting {p['name']} initial speed v0 = beta * c with beta={beta:.3e} based on KE={KE_i:.2e} eV")
         print(f"Setting {p['name']} initial position to {p['r0']/RE} RE")
 
