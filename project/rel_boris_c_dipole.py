@@ -16,18 +16,14 @@ import argparse
 # ── Physical constants ──────────────────────────────────────────────────────
 c       = 299792458.0       # speed of light                      [m/s]
 RE      = 6378137.0         # Earth radius                        [m]
-m_e     = 9.10938356e-31    # electron mass                       [kg]
-m_p     = 1.6726219e-27     # proton mass                         [kg]
-m_alpha = 6.6446573e-27     # alpha particle (4He nucleus) mass   [kg]
 q_e     = 1.6021766210e-19  # elementary charge / eV->J factor    [C / J eV⁻¹]
-
-sinphi = np.sin(11.7 * np.pi / 180.0)   # dipole tilt (11.7 deg)
-cosphi = np.cos(11.7 * np.pi / 180.0)
 
 
 # ── Earth's tilted dipole magnetic field ────────────────────────────────────
 def dipole_B(r):
     """Return the dipole B-field vector [T] at position r [m]."""
+    sinphi = np.sin(np.deg2rad(11.7))   # dipole tilt (11.7 deg)
+    cosphi = np.cos(np.deg2rad(11.7))
     x, y, z = r
     r5 = (x**2 + y**2 + z**2)**2.5
     Bx = -7.965626e15 * (3*x*z*cosphi + 3*x*y*sinphi) / r5
@@ -261,61 +257,79 @@ def plot_results(results,save=True,show=True,lim=5,out_dir='figures',suffix=''):
         plt.show()
 
 
+# –– Helper functions for initial conditions –––––––––––––––––––––––––––––––––––––––
+def beta_from_ke(KE, m):
+    """Convert kinetic energy [eV] to speed [m/s] for a particle of mass m [kg]."""
+    KE_J = KE * q_e  # Convert eV to Joules
+    gamma = 1 + KE_J / (m * c**2)
+    beta = np.sqrt(1 - 1/gamma**2)
+    return beta
+
+
 # ── Particle configurations and initial conditions ──────────────────────────
-def init_cond(alpha_eq_deg=30.0,KE=None,r0=None):
-    """
-    Build the particle list with initial conditions for the simulation.
-    The equatorial pitch angle is the same for all particles. If KE is provided, it will override the initial speed based on the specified kinetic energy.
+def init_cond(yaml_file):
+    """Load particle configurations from a YAML file. Returns a list of particle dictionaries with initial conditions.
 
-    Parameters:
-    - alpha_eq_deg (float): Equatorial pitch angle in degrees for all particles.
-    - KE (array): Optional kinetic energy in eV to override the initial speed.
-    - r0 (array): Optional initial position in earth radii for all particles.
-    """
-    alpha_eq = np.radians(alpha_eq_deg)
+    The YAML file should contain a list of particles, each with the following fields:
+        - name: Particle name (string)
+        - q: Charge [C]
+        - m: Mass [kg]
+        - T_sim: Simulation time [s]
+        - dt: Time step [s]
+        - store_every: Store every nth step (int)
+        - r0: Initial position vector [Earth radii]
+        - beta: Initial velocity as a fraction of the speed of light (0 means use kinetic energy instead)
+        - alpha: Equatorial pitch angle in degrees
+        - ke: Initial kinetic energy in eV (-1 means use beta instead)
 
-    particles = [
-        dict(name='Proton',
-             q= q_e, m= m_p,
-             T_sim=6.0,dt=0.0001,store_every=10,
-             r0=np.array([2.5*RE, 0.0, 0.0]),
-             v0=np.array([0.0, 0.616 * c * np.sin(alpha_eq), 0.616 * c * np.cos(alpha_eq)]),
-             color='royalblue'),
-        dict(name='Electron',
-             q=-q_e, m=m_e,
-             T_sim=0.6,dt=0.00001,store_every=10,
-             r0=np.array([4.5*RE, 0.0, 0.0]),
-             v0=np.array([0.0, 0.94 * c * np.sin(alpha_eq), 0.94 * c * np.cos(alpha_eq)]),
-             color='crimson'),
-        dict(name='Alpha particle',
-             q=2*q_e, m=m_alpha,
-             T_sim=6.0,dt=0.0001,store_every=10,
-             r0=np.array([2.5*RE, 0.0, 0.0]),
-             v0=np.array([0.0, 0.616 * c * np.sin(alpha_eq), 0.616 * c * np.cos(alpha_eq)]),
-             color='seagreen'),
-    ]
-
-    if KE is not None:
-        KE = np.array(KE)
-        KE = KE * q_e  # Convert eV to Joules
-        for p, KE_i in zip(particles, KE):
-            # Override the initial speed based on the specified kinetic energy
-            gamma = 1 + KE_i / (p['m'] * c**2)
-            beta = np.sqrt(1 - 1/gamma**2)
-            speed = beta * c
-            p['v0'] = np.array([0.0, speed * np.sin(alpha_eq), speed * np.cos(alpha_eq)])
-
-    if r0 is not None:
-        r0 = np.array(r0)
-        for p, r in zip(particles, r0):
-            p['r0'] = np.array([r*RE, 0.0, 0.0])  # Override the initial position in Earth radii
+    For each particle, the initial velocity is computed based on either the specified kinetic energy (ke) or the specified beta (v/c). It has the form: 
     
-    for p in particles:
-        beta = np.linalg.norm(p['v0']) / c
-        KE_i = (1.0 / np.sqrt(1 - beta**2) - 1) * p['m'] * c**2 / np.abs(q_e)  # in eV
-        print(f"Setting {p['name']} initial speed v0 = beta * c with beta={beta:.3e} based on KE={KE_i:.2e} eV")
-        print(f"Setting {p['name']} initial position to {p['r0']/RE} RE")
+    [0, beta * c * sin(alpha), beta * c * cos(alpha)], 
+    
+    where alpha is the equatorial pitch angle in radians.
+    
+    Each returned particle dictionary contains:
+        - name: Particle name (string)
+        - q: Charge [C]
+        - m: Mass [kg]
+        - T_sim: Simulation time [s]
+        - dt: Time step [s]
+        - store_every: Store every nth step (int)
+        - r0: Initial position vector [m]
+        - v0: Initial velocity vector [m/s]
+    """
+    import yaml
+    with open(yaml_file, 'r') as f:
+        config = yaml.safe_load(f)
+    
+    particles = []
+    for p in config['particles']:
+        alpha = np.radians(p['alpha'])
+        ke = p['ke']
+        print(ke)
+        print(type(ke))
+        if ke < 0:
+            # Use beta instead of kinetic energy
+            beta = p['beta']
+            v0 = np.array([0.0, beta * c * np.sin(alpha), beta * c * np.cos(alpha)])
+        else:
+            # Use kinetic energy to compute beta
+            beta = beta_from_ke(ke, p['m'])
+            v0 = np.array([0.0, beta * c * np.sin(alpha), beta * c * np.cos(alpha)])
 
+        r0 = np.array(p['r0']) * RE  # Convert from Earth radii to meters
+
+        particles.append(dict(
+            name=p['name'],
+            q=p['q'],
+            m=p['m'],
+            T_sim=p['T_sim'],
+            dt=p['dt'],
+            store_every=p['store_every'],
+            r0=r0,
+            v0=v0,
+            color=p['color']
+        ))
     return particles
 
 
@@ -324,22 +338,16 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="Relativistic Boris-C particle simulation in Earth's dipole field.")
     parser.add_argument(
-        '--alpha', type=float, default=30.0,
-        help='Equatorial pitch angle in degrees for all particles (default: 30.0)')
-    parser.add_argument(
-        '--plot_limit', type=int, default=5,
-        help='Limit for 3D and 2D plots in Earth radii (default: 5)')
+        '--config', type=str, required=True,
+        help='Load particle configurations from a YAML file')
     parser.add_argument(
         '--suffix', type=str, default='',
         help='Optional suffix for output figure filenames (default: empty)')
     parser.add_argument(
-        '--ke', type=float, nargs='+', default=None,
-        help='Override default initial speed based on specified kinetic energy array (default: None)')
-    parser.add_argument(
-        '--r0', type=float, nargs='+', default=None,
-        help='Override default initial positions with specified array of position vectors in Earth radii (default: None)')
+        '--plot_limit', type=int, default=5,
+        help='Limit for 3D and 2D plots in Earth radii (default: 5)')
     args = parser.parse_args()
 
-    particles   = init_cond(args.alpha, KE=args.ke, r0=args.r0)
-    results     = run_simulation(particles)
+    particles = init_cond(args.config)
+    results = run_simulation(particles)
     plot_results(results, lim=args.plot_limit, suffix=args.suffix)
