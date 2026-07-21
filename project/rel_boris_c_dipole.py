@@ -265,6 +265,12 @@ def beta_from_ke(KE, m):
     beta = np.sqrt(1 - 1/gamma**2)
     return beta
 
+def ke_from_beta(beta, m):
+    """Convert speed [m/s] to kinetic energy [eV] for a particle of mass m [kg]."""
+    gamma = 1 / np.sqrt(1 - beta**2)
+    KE_J = (gamma - 1) * m * c**2
+    KE_eV = KE_J / q_e  # Convert Joules to eV
+    return KE_eV
 
 # ── Particle configurations and initial conditions ──────────────────────────
 def init_cond(yaml_file):
@@ -306,11 +312,10 @@ def init_cond(yaml_file):
     for p in config['particles']:
         alpha = np.radians(p['alpha'])
         ke = p['ke']
-        print(ke)
-        print(type(ke))
         if ke < 0:
             # Use beta instead of kinetic energy
             beta = p['beta']
+            ke = ke_from_beta(beta, p['m'])  # Compute kinetic energy for logging
             v0 = np.array([0.0, beta * c * np.sin(alpha), beta * c * np.cos(alpha)])
         else:
             # Use kinetic energy to compute beta
@@ -330,6 +335,8 @@ def init_cond(yaml_file):
             v0=v0,
             color=p['color']
         ))
+        print(f"Initialized {p['name']}: r0 = {p['r0']} RE, v0 = {beta:.3f} c, alpha = {p['alpha']} deg, ke = {ke:.2e} eV")
+
     return particles
 
 
