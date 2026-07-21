@@ -1,0 +1,37 @@
+particles:
+
+  - name: Proton
+    color: royalblue
+    q:  1.6021766210e-19   # elementary charge [C]
+    m:  1.6726219e-27      # proton mass [kg]
+    T_sim: 6               # simulation time [s]
+    dt: 1.0e-4             # time step [s]
+    store_every: 10        # store every nth step
+    r0: [2.5, 0.0, 0.0]    # initial position in Earth radii
+    beta: 0.616            # initial velocity as a fraction of the speed of light (0 means use kinetic energy instead)
+    alpha: 30.0            # equatorial pitch angle in degrees
+    ke: -1                 # initial kinetic energy in eV (-1 means use beta instead)
+
+  - name: Electron
+    color: crimson
+    q: -1.6021766210e-19   # elementary charge [C]
+    m:  9.10938356e-31     # electron mass [kg]
+    T_sim: 0.6             # simulation time [s]
+    dt: 0.00001            # time step [s]
+    store_every: 10        # store every nth step
+    r0: [4.5, 0.0, 0.0]    # initial position in Earth radii
+    beta: 0                # initial velocity as a fraction of the speed of light (0 means use kinetic energy instead)
+    alpha: 30.0            # equatorial pitch angle in degrees 
+    ke: 1.0e+6             # initial kinetic energy in eV (-1 means use beta instead)
+
+  - name: Alpha particle
+    color: seagreen
+    q:  3.2043532420e-19   # 2 * elementary charge [C]
+    m:  6.6446573e-27      # alpha particle mass [kg]
+    T_sim: 6.0             # simulation time [s]
+    dt: 1.0e-4             # time step [s]
+    store_every: 10        # store every nth step
+    r0: [2.5, 0.0, 0.0]    # initial position in Earth radii
+    beta: 0.616            # initial velocity as a fraction of the speed of light (0 means use kinetic energy instead)
+    alpha: 30.0            # equatorial pitch angle in degrees
+    ke: -1                 # initial kinetic energy in eV (-1 means use beta instead)
