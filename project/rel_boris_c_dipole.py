@@ -404,13 +404,13 @@ def init_cond(yaml_file):
         td = tau_drift(p['m'], p['q'], beta, L, p['alpha'])
         lam_m = mirror_latitude(p['alpha'])
         r_m = L*np.cos(np.radians(lam_m))**2
-        alc_surf = loss_cone(L, RE)
+        alc = loss_cone(L, RE + 100e3)  # Loss cone at 100 km altitude
 
         print(f"gamma={gamma:.4f},  Beq={M_E/(L*RE)**3*1e9:.1f} nT")
         print(f"Tgyro={Tgyro*1e3:.3f} ms  rg={rg/RE:.4f} RE   eps={eps:.4f}")
         print(f"tau_bounce={tb:.4f} s   tau_drift={td:.4f} s ({td/60:.3f} min)")
         print(f"mirror_lat={lam_m:.2f} deg   r_mirror={r_m:.3f} RE")
-        print(f"loss_cone(surface)={alc_surf:.3f} deg\n")  
+        print(f"loss_cone={alc:.3f} deg\n")  
 
     return particles
 
