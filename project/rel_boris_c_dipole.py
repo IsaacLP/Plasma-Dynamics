@@ -6,6 +6,7 @@ Particles : proton, electron, alpha particle
 Field     : Earth's tilted dipole magnetic field (11.7 deg tilt)
 """
 
+import os
 from matplotlib.patches import Circle
 import numpy as np
 import matplotlib.pyplot as plt
@@ -184,6 +185,8 @@ def run_simulation(particles_list):
 
 def plot_results(results,save=True,show=True,lim=5,out_dir='figures',suffix=''):
     """Plot the 3D trajectories, 2D projections, and energy conservation."""
+
+    os.makedirs(out_dir, exist_ok=True)
 
     # ── 3-D trajectory plot ─────────────────────────────────────────────────
     fig = plt.figure(figsize=(12, 10))
@@ -423,6 +426,9 @@ if __name__ == "__main__":
         '--config', type=str, required=True,
         help='Load particle configurations from a YAML file')
     parser.add_argument(
+        '--out_dir', type=str, default='figures',
+        help='Output directory for figures (default: figures)')
+    parser.add_argument(
         '--suffix', type=str, default='',
         help='Optional suffix for output figure filenames (default: empty)')
     parser.add_argument(
@@ -432,4 +438,4 @@ if __name__ == "__main__":
 
     particles = init_cond(args.config)
     results = run_simulation(particles)
-    plot_results(results, lim=args.plot_limit, suffix=args.suffix)
+    plot_results(results, lim=args.plot_limit, out_dir=args.out_dir, suffix=args.suffix)
