@@ -16,9 +16,9 @@ particles:
     color: crimson
     q: -1.6021766210e-19   # elementary charge [C]
     m:  9.10938356e-31     # electron mass [kg]
-    T_sim: 0.6             # simulation time [s]
-    dt: 0.00001            # time step [s]
-    store_every: 10        # store every nth step
+    T_sim: 1.5             # simulation time [s]
+    dt: 1.0e-6             # time step [s]
+    store_every: 20        # store every nth step
     r0: [4.5, 0.0, 0.0]    # initial position in Earth radii
     beta: 0                # initial velocity as a fraction of the speed of light (0 means use kinetic energy instead)
     alpha: 30.0            # equatorial pitch angle in degrees 
@@ -32,6 +32,6 @@ particles:
     dt: 1.0e-4             # time step [s]
     store_every: 10        # store every nth step
     r0: [2.5, 0.0, 0.0]    # initial position in Earth radii
-    beta: 0.616            # initial velocity as a fraction of the speed of light (0 means use kinetic energy instead)
+    beta: 0.5              # initial velocity as a fraction of the speed of light (0 means use kinetic energy instead)
     alpha: 30.0            # equatorial pitch angle in degrees
     ke: -1                 # initial kinetic energy in eV (-1 means use beta instead)
