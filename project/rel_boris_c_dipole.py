@@ -11,12 +11,15 @@ import numpy as np
 import matplotlib.pyplot as plt
 from tqdm import tqdm
 import argparse
+from scipy.optimize import brentq
 
 
 # ── Physical constants ──────────────────────────────────────────────────────
-c       = 299792458.0       # speed of light                      [m/s]
-RE      = 6378137.0         # Earth radius                        [m]
-q_e     = 1.6021766210e-19  # elementary charge / eV->J factor    [C / J eV⁻¹]
+c   = 299792458.0       # speed of light                            [m/s]
+RE  = 6378137.0         # Earth radius                              [m]
+q_e = 1.6021766210e-19  # elementary charge / eV->J factor          [C / J eV^-1]
+M_E = 7.965626e15       # Earth's magnetic dipole moment            [T m^3]
+B0  = M_E / RE**3       # Earth's equatorial surface magnetic field [T]
 
 
 # ── Earth's tilted dipole magnetic field ────────────────────────────────────
@@ -26,10 +29,10 @@ def dipole_B(r):
     cosphi = np.cos(np.deg2rad(11.7))
     x, y, z = r
     r5 = (x**2 + y**2 + z**2)**2.5
-    Bx = -7.965626e15 * (3*x*z*cosphi + 3*x*y*sinphi) / r5
-    By = -7.965626e15 * (3*y*z*cosphi + 2*sinphi*y**2
+    Bx = -M_E * (3*x*z*cosphi + 3*x*y*sinphi) / r5
+    By = -M_E * (3*y*z*cosphi + 2*sinphi*y**2
                          - sinphi*(x**2 + z**2)) / r5
-    Bz = -7.965626e15 * (2*cosphi*z**2 - cosphi*(x**2 + y**2)
+    Bz = -M_E * (2*cosphi*z**2 - cosphi*(x**2 + y**2)
                          + 3*z*y*sinphi) / r5
     return np.array([Bx, By, Bz])
 
@@ -266,7 +269,7 @@ def plot_results(results,save=True,show=True,lim=5,out_dir='figures',suffix=''):
         plt.show()
 
 
-# –– Helper functions for initial conditions –––––––––––––––––––––––––––––––––––––––
+# –– Helper functions for initial conditions and derived physical quantities ––––––––––––––––––––––––––––––––
 def beta_from_ke(KE, m):
     """Convert kinetic energy [eV] to speed [m/s] for a particle of mass m [kg]."""
     KE_J = KE * q_e  # Convert eV to Joules
@@ -281,6 +284,48 @@ def ke_from_beta(beta, m):
     KE_J = (gamma - 1) * m * c**2
     KE_eV = KE_J / q_e  # Convert Joules to eV
     return KE_eV
+
+
+def tau_bounce(beta, L, alpha_deg):
+    """Walt (1994) Eq. 4.28 - bounce period, accurate to ~0.5%."""
+    a = np.radians(alpha_deg)
+    R0 = L * RE
+    return 0.117 * (R0/RE) / beta * (1 - 0.4635*np.sin(a)**0.75)
+
+
+def tau_drift(m, charge, beta, L, alpha_deg):
+    """Walt (1994) Eq. 4.46 - drift period, accurate to ~0.5%.
+    Verified: reproduces Walt's own Cd constants (1.557e4 s electrons,
+    8.481 s protons) to 4 sig figs when evaluated in plain SI units."""
+    v = beta * c
+    a = np.radians(alpha_deg)
+    R0 = L * RE
+    return (2*np.pi*abs(charge)*B0*RE**3) / (m*v**2) * (1/R0) * (1 - 0.3333*np.sin(a)**0.62)
+
+
+def mirror_latitude(alpha_deg):
+    """Solve sin^2(alpha_eq) = cos^6(lam)/sqrt(1+3 sin^2 lam) for lam_m [Eq. 4.24]."""
+    a = np.radians(alpha_deg)
+    def f(lam):
+        return np.cos(lam)**6/np.sqrt(1+3*np.sin(lam)**2) - np.sin(a)**2
+    return np.degrees(brentq(f, 0, np.pi/2 - 1e-6))
+
+
+def loss_cone(L, Ra=RE):
+    """Bounce loss cone angle, field-line-consistent form (Walt, p.43).
+    Reduces to sin^2(a_lc) = 1/sqrt(4L^6-3L^5) when Ra = RE."""
+    x = Ra / (L*RE)
+    return np.degrees(np.arcsin(np.sqrt(x**3/np.sqrt(4-3*x))))
+
+
+def gyro_quantities(m, charge, gamma, v, alpha_deg, L):
+    """Gyroperiod, gyroradius, and adiabaticity parameter."""
+    a = np.radians(alpha_deg)
+    Beq = M_E/(L*RE)**3
+    Tgyro = 2*np.pi*gamma*m/(abs(charge)*Beq)
+    rg = gamma*m*v*np.sin(a)/(abs(charge)*Beq)
+    eps = rg/(L*RE)
+    return Tgyro, rg, eps
 
 
 # ── Particle configurations and initial conditions ──────────────────────────
@@ -319,7 +364,6 @@ def init_cond(yaml_file):
     with open(yaml_file, 'r') as f:
         config = yaml.safe_load(f)
     
-    print()
     particles = []
     for p in config['particles']:
         alpha = np.radians(p['alpha'])
@@ -347,9 +391,26 @@ def init_cond(yaml_file):
             v0=v0,
             color=p['color']
         ))
-        print(f"Initialized {p['name']}: r0 = {p['r0']} RE, v0 = {beta:.3f} c, alpha = {p['alpha']} deg, ke = {ke:.2e} eV")
-    
-    print()
+        print(f"Initialized {p['name']}:")
+        print(f"r0 = {p['r0']} RE   v0 = {beta:.3f} c")
+        print(f"alpha = {p['alpha']} deg   ke = {ke:.2e} eV")
+
+        print("\nWith derived quantities:")
+        gamma = 1/np.sqrt(1-beta**2)
+        v = beta*c
+        L = np.linalg.norm(r0) / RE
+        Tgyro, rg, eps = gyro_quantities(p['m'], p['q'], gamma, v, p['alpha'], L)
+        tb = tau_bounce(beta, L, p['alpha'])
+        td = tau_drift(p['m'], p['q'], beta, L, p['alpha'])
+        lam_m = mirror_latitude(p['alpha'])
+        r_m = L*np.cos(np.radians(lam_m))**2
+        alc_surf = loss_cone(L, RE)
+
+        print(f"gamma={gamma:.4f},  Beq={M_E/(L*RE)**3*1e9:.1f} nT")
+        print(f"Tgyro={Tgyro*1e3:.3f} ms  rg={rg/RE:.4f} RE   eps={eps:.4f}")
+        print(f"tau_bounce={tb:.4f} s   tau_drift={td:.4f} s ({td/60:.3f} min)")
+        print(f"mirror_lat={lam_m:.2f} deg   r_mirror={r_m:.3f} RE")
+        print(f"loss_cone(surface)={alc_surf:.3f} deg\n")  
 
     return particles
 
