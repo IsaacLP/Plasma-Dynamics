@@ -29,7 +29,7 @@ particles:
     ke: -1                 # kinetic energy [eV]  (-1 → use beta instead)
 ```
 
-Set `ke: -1` to specify speed via `beta`, or set `beta: 0` to specify speed via `ke`. In any case the initial velocity will be set to
+Set `ke: -1` to specify speed via `beta`, or set `ke>0` to ignore `beta`and specify speed via `ke`. In any case the initial velocity will be set to
 
 $$v_0 = [0, \beta c\sin(\alpha), \beta c\cos(\alpha)]$$
 
