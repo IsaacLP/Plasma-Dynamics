@@ -21,12 +21,12 @@ q_e = 1.6021766210e-19  # elementary charge / eV->J factor          [C / J eV^-1
 M_E = 7.965626e15       # Earth's magnetic dipole moment            [T m^3]
 B0  = M_E / RE**3       # Earth's equatorial surface magnetic field [T]
 
+sinphi = np.sin(np.deg2rad(11.7))   # dipole tilt (11.7 deg)
+cosphi = np.cos(np.deg2rad(11.7))
 
 # ── Earth's tilted dipole magnetic field ────────────────────────────────────
 def dipole_B(r):
     """Return the dipole B-field vector [T] at position r [m]."""
-    sinphi = np.sin(np.deg2rad(11.7))   # dipole tilt (11.7 deg)
-    cosphi = np.cos(np.deg2rad(11.7))
     x, y, z = r
     r5 = (x**2 + y**2 + z**2)**2.5
     Bx = -M_E * (3*x*z*cosphi + 3*x*y*sinphi) / r5
