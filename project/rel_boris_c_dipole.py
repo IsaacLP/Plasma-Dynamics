@@ -124,21 +124,28 @@ def simulate(name, q, m, r0, v0, dt, T_sim, store_every=1):
     return traj[:j], gammas[:j]
 
 
-def simulate_rk4(name, q, m, r0, v0, dt, T_sim):
-    """RK4 integrator. Returns only (gamma0, gamma_final) for error comparison."""
+def simulate_rk4(name, q, m, r0, v0, dt, T_sim, store_every=1):
+    """RK4 integrator. Returns gamma history at the same cadence as simulate()."""
     n_steps = int(T_sim / dt)
+    n_store = n_steps // store_every + 1
 
     beta2  = np.dot(v0, v0) / c**2
     gamma0 = 1.0 / np.sqrt(1.0 - beta2)
 
     r = r0.copy()
     v = v0.copy()
-    for _ in tqdm(range(n_steps), desc=f"RK4      {name:<14}"):
-        r, v = rk4_step(r, v, q, m, dt)
+    gammas    = np.empty(n_store)
+    gammas[0] = gamma0
 
-    v2          = np.dot(v, v)
-    gamma_final = 1.0 / np.sqrt(max(1e-30, 1.0 - v2 / c**2))
-    return gamma0, gamma_final
+    j = 1
+    for i in tqdm(range(1, n_steps + 1), desc=f"RK4      {name:<14}"):
+        r, v = rk4_step(r, v, q, m, dt)
+        if i % store_every == 0 and j < n_store:
+            v2        = np.dot(v, v)
+            gammas[j] = 1.0 / np.sqrt(max(1e-30, 1.0 - v2 / c**2))
+            j += 1
+
+    return gammas[:j]
 
 
 # –– Simulation and plotting functions ––––––––––––––––––––––––––––––––––––––––
@@ -151,12 +158,12 @@ def run_simulation(particles_list):
         traj, gammas        = simulate(
             p['name'], p['q'], p['m'], p['r0'], p['v0'],
             p['dt'], p['T_sim'], p['store_every'])
-        gamma0, gamma_final = simulate_rk4(
+        gammas_rk4 = simulate_rk4(
             p['name'], p['q'], p['m'], p['r0'], p['v0'],
-            p['dt'], p['T_sim'])
+            p['dt'], p['T_sim'], p['store_every'])
 
-        summary.append((p['name'], gammas[0], gammas[-1], gamma_final))
-        results[p['name']] = dict(traj=traj, gammas=gammas, color=p['color'])
+        summary.append((p['name'], gammas[0], gammas[-1], gammas_rk4[-1]))
+        results[p['name']] = dict(traj=traj, gammas=gammas, gammas_rk4=gammas_rk4, color=p['color'])
 
     # ── Unified energy-error table ────────────────────────────────────────────
     hdr = f"  {'Particle':<16} {'Method':<9} {'gamma_0':>8} {'gamma_final':>10} {'gamma_error':>10}"
@@ -236,17 +243,19 @@ def plot_results(results,save=True,show=True,lim=5,out_dir='figures',suffix=''):
     if show:
         plt.show()
 
-    # ── Energy conservation (relative Lorentz factor error) ─────────────────
+    # ── Energy conservation (|relative Lorentz factor error|, log scale) ──────
     fig3, ax3 = plt.subplots(figsize=(10, 4))
     for name, d in results.items():
-        g0  = d['gammas'][0]
-        err = (d['gammas'] - g0) / g0
-        ax3.plot(err, color=d['color'], linewidth=0.8, label=name)
+        g0 = d['gammas'][0]
+        err_bc  = np.abs(d['gammas']     - g0) / g0
+        err_rk4 = np.abs(d['gammas_rk4'] - g0) / g0
+        ax3.plot(err_bc,  color=d['color'], linewidth=0.8, label=f'{name} Boris-C')
+        ax3.plot(err_rk4, color=d['color'], linewidth=0.8, linestyle='--', label=f'{name} RK4')
 
-    ax3.axhline(0.0, color='k', linewidth=0.5, linestyle='--')
+    ax3.set_yscale('log')
     ax3.set_xlabel('Stored step index')
-    ax3.set_ylabel(r'$\Delta\gamma\;/\;\gamma_0$')
-    ax3.legend(fontsize=11)
+    ax3.set_ylabel(r'$|\Delta\gamma\;/\;\gamma_0|$')
+    ax3.legend(fontsize=10)
     plt.tight_layout()
 
     if save:
@@ -265,12 +274,14 @@ def beta_from_ke(KE, m):
     beta = np.sqrt(1 - 1/gamma**2)
     return beta
 
+
 def ke_from_beta(beta, m):
     """Convert speed [m/s] to kinetic energy [eV] for a particle of mass m [kg]."""
     gamma = 1 / np.sqrt(1 - beta**2)
     KE_J = (gamma - 1) * m * c**2
     KE_eV = KE_J / q_e  # Convert Joules to eV
     return KE_eV
+
 
 # ── Particle configurations and initial conditions ──────────────────────────
 def init_cond(yaml_file):
@@ -308,6 +319,7 @@ def init_cond(yaml_file):
     with open(yaml_file, 'r') as f:
         config = yaml.safe_load(f)
     
+    print()
     particles = []
     for p in config['particles']:
         alpha = np.radians(p['alpha'])
@@ -336,6 +348,8 @@ def init_cond(yaml_file):
             color=p['color']
         ))
         print(f"Initialized {p['name']}: r0 = {p['r0']} RE, v0 = {beta:.3f} c, alpha = {p['alpha']} deg, ke = {ke:.2e} eV")
+    
+    print()
 
     return particles
 
